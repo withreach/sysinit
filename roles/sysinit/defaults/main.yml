@@ -2,7 +2,7 @@
 sysinit_withreach_dir: "{{ lookup('env', 'HOME') }}/withreach"
 
 sysinit_devops_repo_url: "git@github.com:withreach/reach-devops.git"
-sysinit_devops_repo_branch: "main"
+sysinit_devops_repo_branch: "master"
 sysinit_repo_script: "{{ sysinit_withreach_dir }}/bin/getRepos.sh"
 
 sysinit_dev_repos_dir: "{{ sysinit_withreach_dir }}/dev/repos"
