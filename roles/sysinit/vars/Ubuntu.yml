@@ -1,0 +1,15 @@
+---
+sysinit_packages:
+  - amazon-ecr-credential-helper
+  - asciinema
+  - flameshot
+  - stow
+  - xsel
+  - unzip
+
+sysinit_tools:
+  - aws-ssm
+  - docker
+  - mise
+
+sysinit_custom_apt_packages: []

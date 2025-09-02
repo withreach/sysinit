@@ -1,0 +1,81 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: sysinit-arch
+    image: archlinux
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+  - name: sysinit-ubuntu
+    image: ubuntu
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+  - name: sysinit-fedora
+    image: fedora
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+  - name: sysinit-debian
+    image: debian
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ../../../../roles
+  log: true
+  inventory:
+    host_vars:
+      sysinit-arch:
+        ansible_user: root
+      sysinit-fedora:
+        ansible_user: root
+      sysinit-ubuntu:
+        ansible_user: root
+  config_options:
+    defaults:
+      callbacks_enabled: profile_tasks
+      host_key_checking: false
+    ssh_connection:
+      pipelining: true
+verifier:
+  name: ansible
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
