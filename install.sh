@@ -28,7 +28,7 @@ trap cleanup ERR EXIT
 get_packages_for_pm() {
   local pm="$1"
   case "$pm" in
-  apt-get)
+  apt)
     echo "curl git gpg"
     ;;
   pacman)
@@ -72,10 +72,10 @@ install_packages() {
 
   case "$pm" in
   apt)
-    sudo apt-get update
-    sudo apt-get upgrade -y
-    sudo apt-get install -y "$packages"
-    sudo apt-get autoremove -y
+    sudo apt update
+    sudo apt upgrade -y
+    sudo apt install -y "$packages"
+    sudo apt autoremove -y
     ;;
   dnf)
     sudo dnf update -y
