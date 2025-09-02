@@ -111,10 +111,3 @@
       loop: "{{ sysinit_mise_plugins }}"
       register: plugin_install_result
       changed_when: "'installing:' in plugin_install_result.stdout"
-
-#          # Try multiple detection methods
-#          if {{ mise_bin }} which $PLUGIN_BASE >/dev/null 2>&1 || \
-#            {{ mise_bin }} current $PLUGIN_BASE >/dev/null 2>&1 || \
-#            ([ -f "$HOME/.config/mise/config.toml" ] && grep -q "$PLUGIN_BASE" "$HOME/.config/mise/config.toml") || \
-#            {{ mise_bin }} ls --installed | grep -q "^$PLUGIN_BASE"; then
-#            echo "already_present"

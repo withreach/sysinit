@@ -1,7 +1,5 @@
 ---
 sysinit_packages:
-  - asciinema
-  - flameshot
   - unzip
 
 sysinit_tools:

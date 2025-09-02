@@ -166,7 +166,6 @@ setup_git_config() {
   # Check for environment variables first
   GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || true)}"
   GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
-  GIT_SIGNING_KEY="${GIT_SIGNING_KEY:-$(git config --global user.signingkey 2>/dev/null || true)}"
 
   # Prompt for missing required values
   if [ -z "$GIT_USER_NAME" ]; then
@@ -241,7 +240,7 @@ setup_ssh_agent() {
   if [ "$keys_found" = false ]; then
     echo "No SSH keys found in ~/.ssh/"
     echo "Please generate an SSH key pair:"
-    echo "  ssh-keygen -t ed25519 -C \"your_email@withreach.com\""
+    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
     echo "Then run this script again."
     exit 1
   fi

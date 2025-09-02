@@ -4,7 +4,6 @@
     msg:
       - "User: {{ lookup('env', 'USER') }}"
       - "Home: {{ lookup('env', 'HOME') }}"
-      - "User Id: {{ ansible_user_id }}"
       - "System: {{ ansible_system }}"
       - "Architecture: {{ ansible_userspace_architecture }}"
       - "Distribution: {{ ansible_distribution }}"
@@ -27,6 +26,3 @@
   ansible.builtin.include_tasks: "tools/{{ item }}.yml"
   loop: "{{ sysinit_combined_tools | default([]) }}"
   when: sysinit_combined_tools is defined and sysinit_combined_tools | length > 0
-
-- name: Configure Reach local development
-  ansible.builtin.include_tasks: "reach/main.yml"

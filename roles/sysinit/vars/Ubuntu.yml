@@ -1,10 +1,5 @@
 ---
 sysinit_packages:
-  - amazon-ecr-credential-helper
-  - asciinema
-  - flameshot
-  - stow
-  - xsel
   - unzip
 
 sysinit_tools:
