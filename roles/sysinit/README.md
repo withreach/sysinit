@@ -18,6 +18,7 @@ This role is designed to:
 
 - Ansible >= 11.8.0
 - SSH key configured for Git operations (`~/.ssh/id_rsa`) or (`~/.ssh/id_ed25519`)
+- Git configured with global user.name and user.email
 - Sudo privileges for host file modifications
 - Python 3 and pip3 for pre-commit installation
 
@@ -144,7 +145,17 @@ ansible-playbook -i inventory playbook.yml --check
 
 # Skip host modifications
 ansible-playbook -i inventory playbook.yml --skip-tags "hosts"
+
+# Provide Git identity to the playbook
+ansible-playbook -i inventory playbook.yml -K -e "git_user_name=Your Name" -e "git_user_email=you@example.com"
 ```
+
+**Note:** If you use the top-level `install.sh`, you can instead export:
+```bash
+export GIT_USER_NAME="Your Name"
+export GIT_USER_EMAIL="you@example.com"
+```
+The installer will pass these values into Ansible for you.
 
 ## Contributing
 
