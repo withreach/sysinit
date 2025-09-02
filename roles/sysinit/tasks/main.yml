@@ -4,6 +4,7 @@
     msg:
       - "User: {{ lookup('env', 'USER') }}"
       - "Home: {{ lookup('env', 'HOME') }}"
+      - "User Id: {{ ansible_user_id }}"
       - "System: {{ ansible_system }}"
       - "Architecture: {{ ansible_userspace_architecture }}"
       - "Distribution: {{ ansible_distribution }}"
