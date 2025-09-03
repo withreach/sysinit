@@ -14,9 +14,11 @@
 
     - name: Configure system locale
       community.general.locale_gen:
-        name: "{{ item }}"
+        name: "{{ locale_item }}"
         state: present
       loop: "{{ sysinit_locales | default(['en_US.UTF-8']) }}"
+      loop_control:
+        loop_var: locale_item
 
 - name: Add local development hosts
   become: true
