@@ -18,7 +18,7 @@
 
     - name: debug
       debug:
-        var: "{{ docker_gpg_download }}"
+        var: docker_gpg_download
 
     - name: Docker - Import docker GPG key
       ansible.builtin.command:
@@ -32,10 +32,10 @@
         state: absent
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is defined
 
-    - name: Docker - Fix keyring permissions
-      ansible.builtin.file:
-        path: /etc/apt/keyrings/docker.gpg
-        mode: a+r
+    # - name: Docker - Fix keyring permissions
+    #   ansible.builtin.file:
+    #     path: /etc/apt/keyrings/docker.gpg
+    #     mode: a+r
 
     - name: Docker - Add docker repository
       ansible.builtin.apt_repository:
