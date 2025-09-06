@@ -1,0 +1,110 @@
+---
+scenario:
+  name: reach
+  test_sequence:
+    - dependency
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - side_effect
+    - verify
+    - destroy
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: reach-fedora
+    image: fedora:latest
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+    environment:
+      container: docker
+      # Enable systemd for SELinux testing
+      SYSTEMD_NSPAWN_API_VFS_WRITABLE: "network"
+    groups:
+      - reach_test
+
+  - name: reach-ubuntu
+    image: ubuntu:22.04
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: sleep infinity
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+    environment:
+      container: docker
+    groups:
+      - reach_test
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ../../../../roles
+  log: true
+  inventory:
+    host_vars:
+      reach-fedora:
+        ansible_user: root
+        # Test SELinux functionality on Fedora
+        sysinit_reach_selinux_enabled: true
+      reach-ubuntu:
+        ansible_user: root
+        # SELinux not typically enabled on Ubuntu
+        sysinit_reach_selinux_enabled: false
+    group_vars:
+      reach_test:
+        # Override variables for testing
+        sysinit_reach_base_dir: "/tmp/test-withreach"
+        sysinit_reach_devops_repo_url: "https://github.com/withreach/reach-devops.git"
+        sysinit_reach_devops_repo_branch: "master"
+        sysinit_reach_dev_hosts:
+          - test.rch.local
+          - api.test.rch.local
+        # Skip git operations in containers
+        sysinit_var: molecule_converge
+        # Use test-specific configurations
+        sysinit_reach_git_user_name: "Test User"
+        sysinit_reach_git_user_email: "test@example.com"
+  config_options:
+    defaults:
+      callbacks_enabled: profile_tasks
+      host_key_checking: false
+      # Enable reach-specific debugging
+      verbosity: 1
+    ssh_connection:
+      pipelining: true
+  playbooks:
+    converge: converge.yml
+    prepare: prepare.yml
+    side_effect: side_effect.yml
+
+verifier:
+  name: ansible
+  options:
+    v: 1
+
+lint: |
+  set -e
+  yamllint .
+  ansible-lint

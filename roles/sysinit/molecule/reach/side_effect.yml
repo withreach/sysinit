@@ -1,0 +1,97 @@
+---
+- name: Test reach role side effects and edge cases
+  hosts: all
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Test idempotency by running reach tasks again
+      ansible.builtin.include_role:
+        name: sysinit
+      vars:
+        tools: "reach"
+        sysinit_combined_tools:
+          - reach
+      register: second_run
+
+    - name: Verify idempotency (no changes on second run)
+      ansible.builtin.assert:
+        that:
+          - not second_run.changed
+        fail_msg: "Role made changes on second run - not idempotent!"
+        success_msg: "✅ Role is idempotent"
+
+    - name: Test selective tag execution (SSH only)
+      ansible.builtin.include_role:
+        name: sysinit
+        tasks_from: tools/reach.yml
+      vars:
+        ansible_skip_tags: []
+        ansible_tags: 
+          - reach-ssh
+      register: ssh_only_run
+
+    - name: Test selective tag execution (Host only)
+      ansible.builtin.include_role:
+        name: sysinit  
+        tasks_from: tools/reach.yml
+      vars:
+        ansible_skip_tags: []
+        ansible_tags:
+          - reach-host
+      register: host_only_run
+
+    - name: Verify hosts file hasn't been corrupted by multiple runs
+      ansible.builtin.shell: |
+        grep -c "test.rch.local" /etc/hosts
+      register: hosts_count
+      changed_when: false
+      failed_when: hosts_count.stdout | int != 1
+
+    - name: Test configuration file backup functionality
+      ansible.builtin.stat:
+        path: /tmp/test-withreach/dev/.env
+      register: env_file_exists
+
+    - name: Create test configuration file if it doesn't exist
+      ansible.builtin.copy:
+        content: |
+          # Test configuration file
+          TEST_VAR=test_value
+        dest: /tmp/test-withreach/dev/.env
+        mode: '0644'
+      when: not env_file_exists.stat.exists
+
+    - name: Test backup functionality by modifying config
+      ansible.builtin.lineinfile:
+        path: /tmp/test-withreach/dev/.env
+        line: "MODIFIED_VAR=modified_value"
+        create: true
+      register: config_modified
+
+    - name: Verify sudoers file syntax is valid
+      ansible.builtin.shell: |
+        visudo -cf /etc/sudoers.d/root-reach
+      changed_when: false
+      register: sudoers_syntax
+
+    - name: Test SSH agent setup script
+      ansible.builtin.shell: |
+        /root/.ssh/setup-agent.sh
+      register: ssh_agent_test
+      changed_when: false
+
+    - name: Verify no duplicate entries in hosts file
+      ansible.builtin.shell: |
+        awk '/test.rch.local/ {count++} END {print count}' /etc/hosts
+      register: duplicate_check
+      changed_when: false
+      failed_when: duplicate_check.stdout | int > 1
+
+    - name: Display side effect test results
+      ansible.builtin.debug:
+        msg:
+          - "✅ Idempotency: {{ 'PASS' if not second_run.changed else 'FAIL' }}"
+          - "✅ Hosts file integrity: {{ 'PASS' if duplicate_check.stdout | int == 1 else 'FAIL' }}"
+          - "✅ Sudoers syntax: {{ 'PASS' if sudoers_syntax.rc == 0 else 'FAIL' }}"
+          - "✅ SSH agent script: {{ 'PASS' if ssh_agent_test.rc == 0 else 'FAIL' }}"
+          - "📊 Total hosts entries: {{ duplicate_check.stdout }}"

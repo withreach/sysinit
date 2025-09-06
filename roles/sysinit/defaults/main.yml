@@ -1,24 +1,36 @@
 ---
-sysinit_withreach_dir: "{{ lookup('env', 'HOME') }}/withreach"
+# Core sysinit configuration
+sysinit_debug: false
+sysinit_force_update: false
 
-sysinit_devops_repo_url: "git@github.com:withreach/reach-devops.git"
-sysinit_devops_repo_branch: "master"
-sysinit_repo_script: "{{ sysinit_withreach_dir }}/bin/getRepos.sh"
+# Reach directory structure
+sysinit_reach_base_dir: "{{ lookup('env', 'HOME') }}/withreach"
+sysinit_reach_dev_dir: "{{ sysinit_reach_base_dir }}/dev"
+sysinit_reach_repos_dir: "{{ sysinit_reach_dev_dir }}/repos"
+sysinit_reach_v2_dir: "{{ sysinit_reach_repos_dir }}/v2"
 
-sysinit_dev_repos_dir: "{{ sysinit_withreach_dir }}/dev/repos"
-sysinit_v2_dir: "{{ sysinit_dev_repos_dir }}/v2"
+# Reach repository configuration
+sysinit_reach_devops_repo_url: "git@github.com:withreach/reach-devops.git"
+sysinit_reach_devops_repo_branch: "master"
+sysinit_reach_repo_script: "{{ sysinit_reach_base_dir }}/bin/getRepos.sh"
+sysinit_reach_repo_timeout: 300  # seconds
+sysinit_reach_repo_retries: 3
 
-sysinit_vscode_settings_example: "{{ sysinit_v2_dir }}/.vscode/settings-example.json"
-sysinit_vscode_settings: "{{ sysinit_v2_dir }}/.vscode/settings.json"
+# Reach configuration files
+sysinit_reach_env_example: "{{ sysinit_reach_dev_dir }}/env.example"
+sysinit_reach_env_file: "{{ sysinit_reach_dev_dir }}/.env"
+sysinit_reach_config_local_sample: "{{ sysinit_reach_v2_dir }}/config_local.sample.yaml"
+sysinit_reach_config_local: "{{ sysinit_reach_v2_dir }}/config_local.yaml"
 
-sysinit_env_example: "{{ sysinit_withreach_dir }}/dev/env.example"
-sysinit_env_file: "{{ sysinit_withreach_dir }}/dev/.env"
+# Reach VSCode configuration
+sysinit_reach_vscode_settings_example: "{{ sysinit_reach_v2_dir }}/.vscode/settings-example.json"
+sysinit_reach_vscode_settings: "{{ sysinit_reach_v2_dir }}/.vscode/settings.json"
+sysinit_reach_vscode_user_dir: "{{ ansible_env.HOME }}/.config/Code/User"
 
-sysinit_config_local_sample: "{{ sysinit_v2_dir }}/config_local.sample.yaml"
-sysinit_config_local: "{{ sysinit_v2_dir }}/config_local.yaml"
-
-sysinit_hosts_marker: "# Local Development"
-sysinit_dev_hosts:
+# Reach host configuration
+sysinit_reach_hosts_marker: "# Local Development - Reach"
+sysinit_reach_hosts_backup: true
+sysinit_reach_dev_hosts:
   - admin.rch.local
   - admin-api.rch.local
   - checkout.rch.local
@@ -28,6 +40,29 @@ sysinit_dev_hosts:
   - redirect.rch.local
   - vue.admin.rch.local
 
+# Reach SSH configuration
+sysinit_reach_ssh_key_types:
+  - rsa
+  - ed25519
+sysinit_reach_ssh_config_backup: true
+
+# Reach Git configuration
+sysinit_reach_git_user_email: ""
+sysinit_reach_git_user_name: ""
+sysinit_reach_git_default_branch: "main"
+
+# Reach sudoers configuration
+sysinit_reach_sudoers_file: "/etc/sudoers.d/{{ ansible_user_id }}-reach"
+sysinit_reach_sudoers_backup: true
+
+# Reach SELinux configuration
+sysinit_reach_selinux_enabled: "{{ ansible_selinux.status == 'enabled' if ansible_selinux is defined else false }}"
+sysinit_reach_selinux_contexts:
+  - path: "{{ sysinit_reach_base_dir }}"
+    setype: "container_file_t"
+    recurse: true
+
+# Mise plugin configuration
 sysinit_mise_plugins:
   - 1password-cli
   - amazon-ecr-credential-helper
@@ -40,8 +75,5 @@ sysinit_mise_plugins:
   - starship
   - usage
 
-sysinit_git_user_email: ""
-sysinit_git_user_name: ""
-sysinit_git_signing_key: ""
-
+# AWS configuration
 sysinit_aws_sso_role_suffix: "dev"

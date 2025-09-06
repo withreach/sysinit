@@ -1,0 +1,15 @@
+---
+# Molecule requirements for reach testing scenario
+collections:
+  - name: community.general
+    version: ">=7.0.0"
+  - name: community.docker
+    version: ">=3.0.0"
+  - name: ansible.posix
+    version: ">=1.4.0"
+
+# Additional collections specific to reach functionality
+  - name: community.crypto
+    version: ">=2.0.0"
+
+roles: []

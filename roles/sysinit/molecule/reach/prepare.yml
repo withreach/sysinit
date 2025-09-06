@@ -1,0 +1,106 @@
+---
+- name: Prepare reach testing environment
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Install Python3 on Ubuntu (raw)
+      ansible.builtin.raw: |
+        apt-get update
+        apt-get install -y python3 python3-pip
+      when: "'ubuntu' in inventory_hostname"
+      changed_when: false
+      
+    - name: Install Python3 on Fedora (raw)
+      ansible.builtin.raw: |
+        dnf install -y python3 python3-pip python3-libdnf5
+      when: "'fedora' in inventory_hostname"
+      changed_when: false
+      
+    - name: Gather facts after Python installation
+      ansible.builtin.setup:
+    - name: Install required packages for testing
+      ansible.builtin.package:
+        name:
+          - git
+          - openssh-client
+          - sudo
+          - python3
+          - python3-pip
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for testing (Fedora)
+      ansible.builtin.package:
+        name:
+          - git
+          - openssh-clients
+          - sudo
+          - python3
+          - python3-pip
+          - python3-libdnf5
+          - policycoreutils-python-utils  # For SELinux testing
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create test user directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - /tmp/test-withreach
+        - /tmp/test-withreach/dev
+        - /tmp/test-withreach/bin
+        - /root/.ssh
+
+    - name: Create mock repository script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "Mock repository script for testing"
+          mkdir -p /tmp/test-withreach/dev/repos
+          echo "Mock repos.txt for testing" > /tmp/test-withreach/dev/repos.txt
+          exit 0
+        dest: /tmp/test-withreach/bin/getRepos.sh
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create mock repos.txt
+      ansible.builtin.copy:
+        content: |
+          # Mock repositories for testing
+          test-repo-1
+          test-repo-2
+        dest: /tmp/test-withreach/dev/repos.txt
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Create dummy SSH keys for testing
+      ansible.builtin.shell: |
+        ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N '' -C "test@molecule"
+      args:
+        creates: /root/.ssh/id_ed25519
+
+    - name: Set proper SSH key permissions
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+        owner: root
+        group: root
+      loop:
+        - { path: "/root/.ssh/id_ed25519", mode: "0600" }
+        - { path: "/root/.ssh/id_ed25519.pub", mode: "0644" }
+
+    - name: Configure git for testing
+      community.general.git_config:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        scope: global
+      loop:
+        - { key: "user.name", value: "Test User" }
+        - { key: "user.email", value: "test@example.com" }

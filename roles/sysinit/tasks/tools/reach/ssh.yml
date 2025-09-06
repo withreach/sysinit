@@ -5,21 +5,34 @@
     state: directory
     mode: '0700'
     owner: "{{ lookup('env', 'USER') }}"
+  tags:
+    - reach
+    - reach-ssh
+    - ssh
+    - configuration
 
 - name: Check for id_rsa
   ansible.builtin.stat:
     path: "{{ lookup('env', 'HOME') }}/.ssh/id_rsa"
   register: rsa_key
+  tags:
+    - reach
+    - reach-ssh
+    - ssh
 
 - name: Check for id_ed25519
   ansible.builtin.stat:
     path: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
   register: ed_key
+  tags:
+    - reach
+    - reach-ssh
+    - ssh
 
 - name: Generate SSH key if none exists
   ansible.builtin.command: >
     ssh-keygen -t ed25519 -f "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519" -N '' \
-    -C "{{ ansible_user_id }}@{{ ansible_hostname }}"
+    -C "{{ lookup('env', 'USER') }}@{{ ansible_hostname }}"
   become: false
   when: not (rsa_key.stat.exists or ed_key.stat.exists)
   register: ssh_key_generated
@@ -72,21 +85,21 @@
 
       # Check if keys are loaded
       if ! ssh-add -l >/dev/null 2>&1; then
-          echo "No keys loaded in SSH agent. Available keys:"
-          for key in {{ lookup('env', 'HOME') }}/.ssh/id_rsa {{ lookup('env', 'HOME') }}/.ssh/id_ed25519; do
-              if [ -f "$key" ]; then
-                  echo "  - $key"
-                  # Try to add the key (will prompt for passphrase if needed)
-                  if [ "$1" = "--interactive" ]; then
-                      ssh-add "$key"
-                  else
-                      echo "Run 'ssh-add $key' to add this key"
-                  fi
-              fi
-          done
+        echo "No keys loaded in SSH agent. Available keys:"
+        for key in {{ lookup('env', 'HOME') }}/.ssh/id_rsa {{ lookup('env', 'HOME') }}/.ssh/id_ed25519; do
+          if [ -f "$key" ]; then
+            echo "  - $key"
+            # Try to add the key (will prompt for passphrase if needed)
+            if [ "$1" = "--interactive" ]; then
+              ssh-add "$key"
+            else
+              echo "Run 'ssh-add $key' to add this key"
+            fi
+          fi
+        done
       else
-          echo "SSH keys are loaded:"
-          ssh-add -l
+        echo "SSH keys are loaded:"
+        ssh-add -l
       fi
 
       # Export environment for current session
@@ -100,14 +113,14 @@
 - name: Check if SSH agent is running and keys are loaded
   ansible.builtin.shell: |
     if [ -f {{ lookup('env', 'HOME') }}/.ssh/agent-env ]; then
-        source {{ lookup('env', 'HOME') }}/.ssh/agent-env > /dev/null 2>&1
-        if kill -0 "$SSH_AGENT_PID" 2>/dev/null && ssh-add -l >/dev/null 2>&1; then
-            echo "agent_running_with_keys"
-        else
-            echo "agent_needs_setup"
-        fi
-    else
+      source {{ lookup('env', 'HOME') }}/.ssh/agent-env > /dev/null 2>&1
+      if kill -0 "$SSH_AGENT_PID" 2>/dev/null && ssh-add -l >/dev/null 2>&1; then
+        echo "agent_running_with_keys"
+      else
         echo "agent_needs_setup"
+      fi
+    else
+      echo "agent_needs_setup"
     fi
   register: ssh_agent_status
   become: false
@@ -128,12 +141,12 @@
 - name: Source SSH agent environment for Ansible
   ansible.builtin.shell: |
     if [ -f {{ lookup('env', 'HOME') }}/.ssh/agent-env ]; then
-        source {{ lookup('env', 'HOME') }}/.ssh/agent-env
-        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
-        echo "SSH_AGENT_PID=$SSH_AGENT_PID"
+      source {{ lookup('env', 'HOME') }}/.ssh/agent-env
+      echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
+      echo "SSH_AGENT_PID=$SSH_AGENT_PID"
     else
-        echo "no_agent_env"
-        exit 1
+      echo "no_agent_env"
+      exit 1
     fi
   register: agent_env
   become: false

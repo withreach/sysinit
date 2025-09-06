@@ -6,7 +6,7 @@ dependency:
 driver:
   name: docker
 platforms:
-  - name: sysinit-arch
+  - name: sysinit-reach-arch
     image: archlinux
     pre_build_image: true
     privileged: true
@@ -18,7 +18,7 @@ platforms:
       - /tmp
     capabilities:
       - SYS_ADMIN
-  - name: sysinit-ubuntu
+  - name: sysinit-reach-ubuntu
     image: ubuntu
     pre_build_image: true
     privileged: true
@@ -30,7 +30,7 @@ platforms:
       - /tmp
     capabilities:
       - SYS_ADMIN
-  - name: sysinit-fedora
+  - name: sysinit-reach-fedora
     image: fedora
     pre_build_image: true
     privileged: true
@@ -42,7 +42,7 @@ platforms:
       - /tmp
     capabilities:
       - SYS_ADMIN
-  - name: sysinit-debian
+  - name: sysinit-reach-debian
     image: debian
     pre_build_image: true
     privileged: true

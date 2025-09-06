@@ -1,0 +1,103 @@
+---
+- name: Verify reach configuration
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+    test_user: testuser
+    test_home: /home/testuser
+    reach_base: /home/testuser/withreach
+  tasks:
+    - name: Check if reach directory structure exists
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: reach_dir_check
+      loop:
+        - "{{ reach_base }}"
+        - "{{ reach_base }}/dev"
+        - "{{ reach_base }}/dev/repos"
+        - "{{ reach_base }}/bin"
+      failed_when: not reach_dir_check.stat.exists
+
+    - name: Check if SSH directory and keys exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: ssh_file_check
+      loop:
+        - "{{ test_home }}/.ssh"
+        - "{{ test_home }}/.ssh/id_ed25519"
+        - "{{ test_home }}/.ssh/id_ed25519.pub"
+      failed_when: not ssh_file_check.stat.exists
+
+    - name: Verify SSH key permissions
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      register: ssh_perm_check
+      loop:
+        - { path: "{{ test_home }}/.ssh/id_ed25519", expected_mode: "0600" }
+        - { path: "{{ test_home }}/.ssh/id_ed25519.pub", expected_mode: "0644" }
+      failed_when: ssh_perm_check.stat.mode != item.expected_mode
+
+    - name: Check if local hosts file was created
+      ansible.builtin.stat:
+        path: "{{ reach_base }}/dev/local-hosts"
+      register: local_hosts_check
+      failed_when: not local_hosts_check.stat.exists
+
+    - name: Verify local hosts file content
+      ansible.builtin.slurp:
+        src: "{{ reach_base }}/dev/local-hosts"
+      register: hosts_content
+      failed_when: >-
+        'test.rch.local' not in (hosts_content.content | b64decode) or
+        'api.test.rch.local' not in (hosts_content.content | b64decode)
+
+    - name: Verify sudoers configuration
+      ansible.builtin.stat:
+        path: "/etc/sudoers.d/{{ test_user }}-reach"
+      register: sudoers_check
+      failed_when: not sudoers_check.stat.exists
+
+    - name: Check if repository script is executable
+      ansible.builtin.stat:
+        path: "{{ reach_base }}/bin/getRepos.sh"
+      register: repo_script_check
+      failed_when: not (repo_script_check.stat.exists and repo_script_check.stat.executable)
+
+    - name: Test repository script execution
+      ansible.builtin.command:
+        cmd: "{{ reach_base }}/bin/getRepos.sh"
+      become_user: "{{ test_user }}"
+      register: script_output
+      changed_when: false
+      failed_when: "'Mock repository script for reach testing' not in script_output.stdout"
+
+    - name: Verify directory ownership
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: ownership_check
+      loop:
+        - "{{ reach_base }}"
+        - "{{ test_home }}/.ssh"
+      failed_when: ownership_check.stat.pw_name != test_user
+
+    - name: Test SELinux context (if enabled)
+      ansible.builtin.command:
+        cmd: "ls -Z {{ reach_base }}"
+      register: selinux_check
+      when: 
+        - ansible_selinux is defined
+        - ansible_selinux.status == "enabled"
+      changed_when: false
+      failed_when: false
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg:
+          - "✅ Reach directory structure: {{ reach_base }} exists"
+          - "✅ SSH keys generated: {{ test_home }}/.ssh/id_ed25519"
+          - "✅ Local hosts file: {{ reach_base }}/dev/local-hosts created"
+          - "✅ Sudoers config: /etc/sudoers.d/{{ test_user }}-reach exists"
+          - "✅ Repository script: {{ reach_base }}/bin/getRepos.sh is executable"
+          - "✅ Directory ownership: All owned by {{ test_user }}"
+          - "📝 SELinux: {{ 'Checked' if selinux_check is defined and not selinux_check.skipped else 'Skipped (container or disabled)' }}"
