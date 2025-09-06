@@ -6,10 +6,11 @@ An opinionated script to initialize your Linux system.
 
 This release has been tested on the following distributions, and should work on all distros based from:
 
-- Debian
-- Ubuntu
-- CentOS
 - Arch
+- CentOS
+- Debian
+- Fedora
+- Ubuntu
 
 ## Prerequisites (Mandatory)
 

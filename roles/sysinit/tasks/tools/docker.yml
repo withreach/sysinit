@@ -16,10 +16,6 @@
       register: docker_gpg_download
       when: not docker_keyring_exists.stat.exists
 
-    - name: debug
-      debug:
-        var: docker_gpg_download
-
     - name: Docker - Import docker GPG key
       ansible.builtin.command:
         cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /tmp/docker.gpg
