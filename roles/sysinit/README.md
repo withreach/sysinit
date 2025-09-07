@@ -3,7 +3,7 @@
 [![Ansible Galaxy](https://img.shields.io/ansible/role/sysinit.svg)](https://galaxy.ansible.com/kedwards/sysinit)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kedwards/sysinit/blob/main/LICENSE)
 
-An Ansible role for Reach system initialization and development environment configuration. This role automates the setup of development environments by cloning required repositories,
+An Ansible role for system initialization and development environment configuration. This role automates the setup of development environments by cloning required repositories,
 configuring local hosts, setting up pre-commit hooks.
 
 ## Purpose
@@ -88,6 +88,7 @@ dev_hosts:
 ## Dependencies
 
 This role has no external role dependencies but requires the following Ansible collections:
+- `ansible.posix`
 - `community.general`
 - `community.docker` (if using Docker-related tasks)
 
