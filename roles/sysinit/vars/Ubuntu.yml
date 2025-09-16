@@ -1,8 +1,4 @@
 ---
-sysinit_packages:
-  - unzip
-
 sysinit_tools:
   - aws-ssm
   - docker
-  - mise

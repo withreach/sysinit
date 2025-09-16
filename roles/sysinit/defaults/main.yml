@@ -1,7 +1,30 @@
 ---
-# Core sysinit configuration
 sysinit_debug: false
 sysinit_force_update: false
+
+sysinit_packages:
+  - gcc
+  - make
+  - stow
+  - unzip
+  - xclip
+  - xsel
+  - zip
+
+sysinit_sys_tools:
+  - mise
+
+sysinit_mise_plugins:
+  - 1password-cli
+  - amazon-ecr-credential-helper
+  - awscli
+  - github-cli
+  - granted
+  - jq
+  - node
+  - python@3.11
+  - starship
+  - usage
 
 # Reach directory structure
 sysinit_reach_base_dir: "{{ lookup('env', 'HOME') }}/withreach"
@@ -61,19 +84,6 @@ sysinit_reach_selinux_contexts:
   - path: "{{ sysinit_reach_base_dir }}"
     setype: "container_file_t"
     recurse: true
-
-# Mise plugin configuration
-sysinit_mise_plugins:
-  - 1password-cli
-  - amazon-ecr-credential-helper
-  - awscli
-  - github-cli
-  - granted
-  - jq
-  - node
-  - python@3.11
-  - starship
-  - usage
 
 # AWS configuration
 sysinit_aws_sso_role_suffix: "dev"

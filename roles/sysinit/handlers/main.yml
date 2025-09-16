@@ -1,4 +1,35 @@
 ---
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: "reload systemd"
+
+- name: restart ssh service
+  ansible.builtin.service:
+    name: "{{ ssh_service_name | default('sshd') }}"
+    state: restarted
+  become: true
+  listen: "restart ssh"
+
+- name: reload ssh config
+  ansible.builtin.meta: noop
+  listen: "reload ssh config"
+
+# General headers
+- name: restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  become: true
+  listen: "restart docker"
+
+- name: reload profile
+  ansible.builtin.shell:
+    cmd: "source {{ lookup('env', 'HOME') }}/.bashrc"
+  become: false
+  listen: "reload profile"
+
 # Reach handlers
 - name: restore selinux contexts
   ansible.builtin.command:
@@ -35,12 +66,6 @@
     SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
   listen: "update git repositories"
 
-- name: reload systemd daemon
-  ansible.builtin.systemd:
-    daemon_reload: true
-  become: true
-  listen: "reload systemd"
-
 - name: validate hosts file
   ansible.builtin.command:
     cmd: "getent hosts {{ item }}"
@@ -64,27 +89,4 @@
     - item.src is file
   listen: "backup reach config"
 
-- name: restart ssh service
-  ansible.builtin.service:
-    name: "{{ ssh_service_name | default('sshd') }}"
-    state: restarted
-  become: true
-  listen: "restart ssh"
 
-- name: reload ssh config
-  ansible.builtin.meta: noop
-  listen: "reload ssh config"
-
-# General headers
-- name: restart docker
-  ansible.builtin.service:
-    name: docker
-    state: restarted
-  become: true
-  listen: "restart docker"
-
-- name: reload profile
-  ansible.builtin.shell:
-    cmd: "source {{ lookup('env', 'HOME') }}/.bashrc"
-  become: false
-  listen: "reload profile"
