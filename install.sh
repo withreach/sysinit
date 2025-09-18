@@ -187,88 +187,145 @@ setup_git_config() {
   export GIT_USER_EMAIL
 }
 
+
 # Setup SSH agent for GitHub access
 setup_ssh_agent() {
   local ssh_env="$HOME/.ssh/agent-env"
+  local existing_agent=false
+  local keys_loaded=false
 
   # Ensure .ssh directory exists
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
 
-  # Kill any existing ssh-agent if running
-  if [ -f "$ssh_env" ]; then
+  # Check if there's already a working SSH agent with keys
+  if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -n "${SSH_AGENT_PID:-}" ]; then
+    if kill -0 "$SSH_AGENT_PID" 2>/dev/null && ssh-add -l >/dev/null 2>&1; then
+      echo "Found existing SSH agent with keys loaded, using it"
+      existing_agent=true
+      keys_loaded=true
+    fi
+  fi
+
+  # If no existing agent, check if we have one saved in agent-env
+  if [ "$existing_agent" = false ] && [ -f "$ssh_env" ]; then
     # shellcheck source=/dev/null
     source "$ssh_env" >/dev/null 2>&1 || true
     if [ -n "${SSH_AGENT_PID:-}" ] && kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
-      kill "$SSH_AGENT_PID" 2>/dev/null || true
-    fi
-  fi
-
-  # Start fresh SSH agent
-  ssh-agent >"$ssh_env"
-  chmod 600 "$ssh_env"
-
-  # Source the agent environment
-  # shellcheck disable=SC1090
-  source "$ssh_env" >/dev/null
-
-  # Verify agent is running
-  if [ -z "${SSH_AGENT_PID:-}" ] || ! kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
-    echo "Error: Failed to start SSH agent"
-    exit 1
-  fi
-
-  # Look for SSH keys to add
-  local keys_found=false
-  local keys_added=false
-
-  for key in ~/.ssh/id_rsa ~/.ssh/id_ed25519 ~/.ssh/id_ecdsa; do
-    if [ -f "$key" ]; then
-      keys_found=true
-
-      # Try to add the key
-      if ssh-add "$key" 2>/dev/null; then
-        keys_added=true
-        break
+      if ssh-add -l >/dev/null 2>&1; then
+        echo "Found existing SSH agent in $ssh_env with keys loaded, using it"
+        existing_agent=true
+        keys_loaded=true
       else
-        echo "Failed to add $key (may need passphrase or key is invalid)"
+        echo "Found existing SSH agent in $ssh_env but no keys loaded"
+        existing_agent=true
       fi
     fi
-  done
+  fi
 
-  # Check if any keys were found
-  if [ "$keys_found" = false ]; then
-    echo "No SSH keys found in ~/.ssh/"
-    echo "Please generate an SSH key pair:"
-    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
-    echo "Then run this script again."
+  # Start new agent only if we don't have a working one
+  if [ "$existing_agent" = false ]; then
+    echo "Starting new SSH agent"
+    # Kill any stale agents first
+    if [ -f "$ssh_env" ]; then
+      # shellcheck source=/dev/null
+      source "$ssh_env" >/dev/null 2>&1 || true
+      if [ -n "${SSH_AGENT_PID:-}" ] && kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
+        kill "$SSH_AGENT_PID" 2>/dev/null || true
+      fi
+    fi
+
+    ssh-agent >"$ssh_env"
+    chmod 600 "$ssh_env"
+    # shellcheck disable=SC1090
+    source "$ssh_env" >/dev/null
+
+    # Verify agent is running
+    if [ -z "${SSH_AGENT_PID:-}" ] || ! kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
+      echo "Error: Failed to start SSH agent"
+      exit 1
+    fi
+  fi
+
+  # If we don't have keys loaded, try to load them
+  if [ "$keys_loaded" = false ]; then
+    echo "Attempting to load SSH keys..."
+    
+    # Look for SSH keys to add
+    local keys_found=false
+    local keys_added=false
+
+    for key in ~/.ssh/id_rsa ~/.ssh/id_ed25519 ~/.ssh/id_ecdsa; do
+      if [ -f "$key" ]; then
+        keys_found=true
+        echo "Found SSH key: $key"
+
+        # First try without passphrase (for unencrypted keys)
+        if ssh-add "$key" 2>/dev/null; then
+          echo "Successfully added $key (no passphrase required)"
+          keys_added=true
+          break
+        else
+          # If that fails, try with interactive passphrase (only if we have a TTY)
+          if [ -t 0 ] && [ -t 1 ]; then
+            echo "Key $key appears to be encrypted, prompting for passphrase..."
+            if ssh-add "$key"; then
+              echo "Successfully added $key with passphrase"
+              keys_added=true
+              break
+            else
+              echo "Failed to add $key even with passphrase prompt"
+            fi
+          else
+            echo "Key $key appears to be encrypted but no TTY available for passphrase"
+          fi
+        fi
+      fi
+    done
+
+    # Check if any keys were found
+    if [ "$keys_found" = false ]; then
+      echo "No SSH keys found in ~/.ssh/"
+      echo "Please generate an SSH key pair:"
+      echo "  ssh-keygen -t ed25519 -C \"your-email@example.com\""
+      echo "Then run this script again."
+      exit 1
+    fi
+
+    # Check if any keys were successfully added
+    if [ "$keys_added" = false ]; then
+      echo ""
+      echo "No SSH keys could be loaded automatically. This might be due to:"
+      echo "  - Encrypted keys requiring passphrase (and no TTY available)"
+      echo "  - Invalid or corrupted key files"
+      echo "  - Permission issues"
+      echo ""
+      echo "Please manually load your key and run this script again:"
+      echo "  # Source the SSH agent environment"
+      echo "  source $ssh_env"
+      echo "  # Add your key (replace with your actual key file)"
+      echo "  ssh-add ~/.ssh/id_rsa  # or ~/.ssh/id_ed25519"
+      echo "  # Then run this script again"
+      echo "  bash $0"
+      echo ""
+      echo "Or run this script directly in an interactive terminal."
+      exit 1
+    fi
+  fi
+
+  # Final verification that we have working SSH keys
+  if ! ssh-add -l >/dev/null 2>&1; then
+    echo "Error: SSH agent is running but no keys are loaded"
     exit 1
   fi
 
-  # Check if any keys were successfully added
-  if [ "$keys_added" = false ]; then
-    echo "No SSH keys could be loaded. This might be due to:"
-    echo "  - Encrypted keys requiring passphrase"
-    echo "  - Invalid or corrupted key files"
-    echo "  - Permission issues"
-    echo ""
-    echo "Please manually add your key:"
-    echo "  source $ssh_env"
-    echo "  ssh-add ~/.ssh/id_ed25519  # or your key file"
-    echo "Then run this script again."
-    exit 1
-  fi
+  echo "SSH agent setup complete with $(ssh-add -l | wc -l) key(s) loaded"
 
   # Export environment for Ansible
   export SSH_AUTH_SOCK
   export SSH_AGENT_PID
 }
 
-# Main execution with better error handling
-main() {
-  install_packages
-  install_mise
-  sync_repo
   setup_git_config
   setup_ssh_agent
   setup_python_env
