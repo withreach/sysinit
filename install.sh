@@ -187,7 +187,6 @@ setup_git_config() {
   export GIT_USER_EMAIL
 }
 
-
 # Setup SSH agent for GitHub access
 setup_ssh_agent() {
   local ssh_env="$HOME/.ssh/agent-env"
@@ -313,6 +312,55 @@ setup_ssh_agent() {
     fi
   fi
 
+
+  # Look for SSH keys to add
+  local keys_found=false
+  local keys_added=false
+
+  for key in ~/.ssh/id_rsa ~/.ssh/id_ed25519 ~/.ssh/id_ecdsa; do
+    if [ -f "$key" ]; then
+      keys_found=true
+
+      # Try to add the key
+      if ssh-add "$key" 2>/dev/null; then
+        keys_added=true
+        break
+      else
+        echo "Failed to add $key (may need passphrase or key is invalid)"
+      fi
+    fi
+  done
+
+  # Check if any keys were found
+  if [ "$keys_found" = false ]; then
+    echo "No SSH keys found in ~/.ssh/"
+    echo "Please generate an SSH key pair:"
+    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
+    echo "Then run this script again."
+    exit 1
+  fi
+
+  # Check if any keys were successfully added
+    if [ "$keys_added" = false ]; then
+      echo ""
+      echo "No SSH keys could be loaded automatically. This might be due to:"
+      echo "  - Encrypted keys requiring passphrase (and no TTY available)"
+      echo "  - Invalid or corrupted key files"
+      echo "  - Permission issues"
+      echo ""
+      echo "Please manually load your key and run this script again:"
+      echo "  # Source the SSH agent environment"
+      echo "  source $ssh_env"
+      echo "  # Add your key (replace with your actual key file)"
+      echo "  ssh-add ~/.ssh/id_rsa  # or ~/.ssh/id_ed25519"
+      echo "  # Then run this script again"
+      echo "  bash $0"
+      echo ""
+      echo "Or run this script directly in an interactive terminal."
+      exit 1
+    fi
+  fi
+
   # Final verification that we have working SSH keys
   if ! ssh-add -l >/dev/null 2>&1; then
     echo "Error: SSH agent is running but no keys are loaded"
@@ -326,6 +374,11 @@ setup_ssh_agent() {
   export SSH_AGENT_PID
 }
 
+# Main execution with better error handling
+main() {
+  install_packages
+  install_mise
+  sync_repo
   setup_git_config
   setup_ssh_agent
   setup_python_env
