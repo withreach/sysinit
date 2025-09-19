@@ -7,4 +7,9 @@
     upgrade: false
     sysinit_var: system_initialization
   roles:
-    - sysinit
+    - role: sysinit
+      tags:
+        - all
+        - setup
+        - system
+        - sysinit
