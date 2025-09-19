@@ -3,8 +3,8 @@
   ansible.builtin.copy:
     content: |
       # Allow user to modify /etc/hosts without password for reach development
-      {{ local('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/tee -a /etc/hosts
-      {{ local('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/sed -i * /etc/hosts
+      {{ lookup('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/tee -a /etc/hosts
+      {{ lookup('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/sed -i * /etc/hosts
     dest: "{{ sysinit_reach_sudoers_file }}"
     owner: root
     group: root
