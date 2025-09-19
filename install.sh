@@ -312,7 +312,6 @@ setup_ssh_agent() {
     fi
   fi
 
-
   # Look for SSH keys to add
   local keys_found=false
   local keys_added=false
@@ -341,24 +340,23 @@ setup_ssh_agent() {
   fi
 
   # Check if any keys were successfully added
-    if [ "$keys_added" = false ]; then
-      echo ""
-      echo "No SSH keys could be loaded automatically. This might be due to:"
-      echo "  - Encrypted keys requiring passphrase (and no TTY available)"
-      echo "  - Invalid or corrupted key files"
-      echo "  - Permission issues"
-      echo ""
-      echo "Please manually load your key and run this script again:"
-      echo "  # Source the SSH agent environment"
-      echo "  source $ssh_env"
-      echo "  # Add your key (replace with your actual key file)"
-      echo "  ssh-add ~/.ssh/id_rsa  # or ~/.ssh/id_ed25519"
-      echo "  # Then run this script again"
-      echo "  bash $0"
-      echo ""
-      echo "Or run this script directly in an interactive terminal."
-      exit 1
-    fi
+  if [ "$keys_added" = false ]; then
+    echo ""
+    echo "No SSH keys could be loaded automatically. This might be due to:"
+    echo "  - Encrypted keys requiring passphrase (and no TTY available)"
+    echo "  - Invalid or corrupted key files"
+    echo "  - Permission issues"
+    echo ""
+    echo "Please manually load your key and run this script again:"
+    echo "  # Source the SSH agent environment"
+    echo "  source $ssh_env"
+    echo "  # Add your key (replace with your actual key file)"
+    echo "  ssh-add ~/.ssh/id_rsa  # or ~/.ssh/id_ed25519"
+    echo "  # Then run this script again"
+    echo "  bash $0"
+    echo ""
+    echo "Or run this script directly in an interactive terminal."
+    exit 1
   fi
 
   # Final verification that we have working SSH keys
