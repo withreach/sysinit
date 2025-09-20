@@ -167,20 +167,17 @@ setup_git_config() {
   GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || true)}"
   GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
 
-  # Prompt for missing required values
+  # Use default values if still empty instead of prompting
   if [ -z "$GIT_USER_NAME" ]; then
-    read -rp "Enter your Git user name: " GIT_USER_NAME
+    GIT_USER_NAME="${USER:-$(whoami)}"
   fi
 
   if [ -z "$GIT_USER_EMAIL" ]; then
-    read -rp "Enter your Git email: " GIT_USER_EMAIL
+    local hostname=$(hostname 2>/dev/null || echo "localhost")
+    GIT_USER_EMAIL="${USER:-$(whoami)}@${hostname}"
   fi
 
-  # Validate required fields
-  if [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
-    echo "Error: Git user name and email are required"
-    exit 1
-  fi
+  echo "Git configuration: $GIT_USER_NAME <$GIT_USER_EMAIL>"
 
   # Export for use in ansible
   export GIT_USER_NAME
