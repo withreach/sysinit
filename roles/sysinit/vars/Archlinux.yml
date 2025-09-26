@@ -1,1 +1,3 @@
 ---
+sysinit_distro_packages:
+  - postgresql

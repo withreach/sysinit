@@ -40,3 +40,10 @@
     - reach
     - reach-user
     - always
+
+- name: Generate SSL certificates
+  ansible.builtin.include_tasks: "reach/ssl-certs.yml"
+  tags:
+    - reach
+    - reach-ssl
+    - ssl-certs

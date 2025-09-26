@@ -18,6 +18,7 @@
           - mise
           - node
           - op
+          - psql
           - python
           - starship
 

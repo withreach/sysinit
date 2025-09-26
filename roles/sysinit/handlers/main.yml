@@ -89,4 +89,15 @@
     - item.src is file
   listen: "backup reach config"
 
+- name: Update ca certificates
+  ansible.builtin.command:
+    cmd: update-ca-certificates
+  become: true
+  listen: "Update ca certificates"
+
+- name: Update ca trust
+  ansible.builtin.command:
+    cmd: update-ca-trust extract
+  become: true
+  listen: "Update ca trust"
 

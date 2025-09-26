@@ -91,6 +91,28 @@
       changed_when: false
       failed_when: false
 
+    - name: Check PostgreSQL client availability
+      ansible.builtin.command:
+        cmd: psql --version
+      register: psql_check
+      changed_when: false
+      failed_when: psql_check.rc != 0
+
+    - name: Verify PostgreSQL client version
+      ansible.builtin.assert:
+        that:
+          - "'PostgreSQL' in psql_check.stdout"
+          - "'16.' in psql_check.stdout"
+        fail_msg: "PostgreSQL client version check failed: {{ psql_check.stdout }}"
+        success_msg: "PostgreSQL client is properly installed: {{ psql_check.stdout.strip() }}"
+
+    - name: Test PostgreSQL client help command
+      ansible.builtin.command:
+        cmd: psql --help
+      register: psql_help_check
+      changed_when: false
+      failed_when: psql_help_check.rc != 0
+
     - name: Display verification results
       ansible.builtin.debug:
         msg:
@@ -100,4 +122,5 @@
           - "✅ Sudoers config: /etc/sudoers.d/{{ test_user }}-reach exists"
           - "✅ Repository script: {{ reach_base }}/bin/getRepos.sh is executable"
           - "✅ Directory ownership: All owned by {{ test_user }}"
+          - "✅ PostgreSQL client: {{ psql_check.stdout.strip() }}"
           - "📝 SELinux: {{ 'Checked' if selinux_check is defined and not selinux_check.skipped else 'Skipped (container or disabled)' }}"
