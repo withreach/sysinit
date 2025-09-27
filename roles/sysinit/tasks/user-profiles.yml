@@ -1,0 +1,95 @@
+---
+- name: Create all necessary directories from filetree
+  become: false
+  ansible.builtin.file:
+    path: "/home/{{ lookup('env', 'USER') }}/{{ (item.path | dirname) }}"
+    state: directory
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    mode: >-
+      {{
+        '0700'
+        if ((item.path | dirname) | regex_search('(^|/)(\\.ssh|\\.gpg|\\.profile\\.d)(/|$)'))
+        else
+          '0755'
+      }}
+  loop: >-
+    {{ lookup('community.general.filetree',
+              role_path ~ '/templates/system-skel/',
+              wantlist=True) }}
+  when:
+    - item.state == 'file'
+    - (item.path | dirname) != '.'
+    - (item.path | dirname) != ''
+
+- name: Deploy system configuration files from skel templates
+  become: false
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/home/{{ lookup('env', 'USER') }}/{{ item.path }}"
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    mode: >-
+      {{
+        '0600'
+        if (item.path | regex_search('(^|/)(\\.ssh|\\.gpg)/'))
+        else '0644'
+      }}
+  loop: >-
+    {{ lookup('community.general.filetree',
+              role_path ~ '/templates/system-skel/',
+              wantlist=True) }}
+  when:
+    - item.state == "file"
+    - item.path != '.profile.d/aws'
+
+- name: Install .profile.d/aws as a plain file (no templating)
+  become: false
+  ansible.builtin.copy:
+    src: "{{ role_path }}/templates/system-skel/.profile.d/aws"
+    dest: "/home/{{ lookup('env', 'USER') }}/.profile.d/aws"
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    mode: '0644'
+  when: ansible_facts is defined
+
+- name: Add profile.d loader to .bashrc
+  become: false
+  ansible.builtin.blockinfile:
+    path: "/home/{{ lookup('env', 'USER') }}/.bashrc"
+    marker: "# {mark} sysinit: load custom profile settings"
+    block: |
+      if [ -d "$HOME/.profile.d" ]; then
+        # Files to exclude from sourcing
+        exclude_list=(
+          "$HOME/.profile.d/secret"
+        )
+
+        for profile_file in "$HOME"/.profile.d/*; do
+          # Skip if not a regular readable file
+          [ -f "$profile_file" ] && [ -r "$profile_file" ] || continue
+
+          # Skip hidden files (.something)
+          [[ "$(basename "$profile_file")" == .* ]] && continue
+
+          # Skip if file is in exclude_list
+          if printf '%s\n' "${exclude_list[@]}" | grep -Fxq "$profile_file"; then
+            continue
+          fi
+
+          source "$profile_file"
+        done
+      fi
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    mode: '0644'
+    create: true
+
+- name: Ensure proper ownership of .profile.d directory and contents
+  ansible.builtin.file:
+    path: "/home/{{ lookup('env', 'USER') }}/.profile.d"
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    recurse: true
+    state: directory
+  when: ansible_facts is defined

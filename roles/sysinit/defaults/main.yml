@@ -13,7 +13,6 @@ sysinit_packages:
 
 sysinit_sys_tools:
   - mise
-  - reach
 
 sysinit_mise_plugins:
   - 1password-cli

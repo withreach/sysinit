@@ -5,6 +5,101 @@ set -euo pipefail
 SYSINIT_REPO=https://github.com/withreach/sysinit.git
 script_dir="$HOME/sysinit"
 
+# Global variables for tag management
+USE_REACH=false
+ANSIBLE_TAGS="system"
+SKIP_SSH=false
+
+# Show usage information
+show_usage() {
+  cat << EOF
+Usage: $0 [OPTIONS]
+
+Options:
+  --reach        Include reach-specific configuration (SSH, repos, etc.)
+  --help, -h     Show this help message
+
+Examples:
+  # System only installation
+  $0
+  
+  # System + reach installation  
+  $0 --reach
+  
+  # Via wget (system only)
+  wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
+  
+  # Via wget with reach
+  wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash -s -- --reach
+
+Tags used:
+  system - Core system packages and development tools
+  reach  - Company-specific configuration (SSH, repos, sudo)
+  wsl    - Automatically detected WSL-specific tools
+
+EOF
+}
+
+# Parse command line arguments
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --reach)
+        USE_REACH=true
+        shift
+        ;;
+      --help|-h)
+        show_usage
+        exit 0
+        ;;
+      *)
+        echo "Unknown option: $1"
+        show_usage
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# Detect if running in WSL
+detect_wsl() {
+  if [[ -f /proc/version ]] && grep -qi microsoft /proc/version; then
+    return 0  # WSL detected
+  elif [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+    return 0  # WSL detected via environment variable
+  elif [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
+    return 0  # WSL detected via interop file
+  else
+    return 1  # Not WSL
+  fi
+}
+
+# Determine which ansible tags to use
+determine_ansible_tags() {
+  local tags=("system")
+  
+  # Add reach tag if requested
+  if [[ "$USE_REACH" == "true" ]]; then
+    tags+=("reach")
+    SKIP_SSH=false
+  else
+    SKIP_SSH=true
+  fi
+  
+  # Add wsl tag if detected
+  if detect_wsl; then
+    tags+=("wsl")
+  fi
+  
+  # Join tags with comma
+  ANSIBLE_TAGS=$(IFS=','; echo "${tags[*]}")
+  
+  echo "🏷️  Using ansible tags: $ANSIBLE_TAGS"
+  if [[ "$SKIP_SSH" == "true" ]]; then
+    echo "🔑 SSH setup will be skipped (system-only install)"
+  fi
+}
+
 cleanup() {
   if command -v deactivate >/dev/null; then
     deactivate || true
@@ -155,8 +250,10 @@ setup_python_env() {
 
 # Run ansible playbook
 run_ansible() {
+  echo "🚀 Running ansible playbook with tags: $ANSIBLE_TAGS"
   ansible-playbook playbook.yml \
     -K \
+    -t "$ANSIBLE_TAGS" \
     -e "git_user_name=${GIT_USER_NAME}" \
     -e "git_user_email=${GIT_USER_EMAIL}"
 }
@@ -382,11 +479,22 @@ setup_ssh_agent() {
 
 # Main execution with better error handling
 main() {
+  # Parse command line arguments
+  parse_arguments "$@"
+  
+  # Determine which tags to use
+  determine_ansible_tags
+  
   install_packages
   install_mise
   sync_repo
   setup_git_config
-  setup_ssh_agent
+  
+  # Skip SSH setup if not needed for reach configuration
+  if [[ "$SKIP_SSH" != "true" ]]; then
+    setup_ssh_agent
+  fi
+  
   setup_python_env
   run_ansible
 }

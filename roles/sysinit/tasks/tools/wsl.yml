@@ -88,7 +88,8 @@
 
     - name: WSL - Check if usbipd-win is already installed
       ansible.builtin.shell: |
-        /mnt/c/Windows/System32/cmd.exe /c "where usbipd" 2>/dev/null || echo "not found"
+        # Use PowerShell to check for usbipd installation to avoid UNC path issues with cmd.exe
+        /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "if (Test-Path 'C:\\Program Files\\usbipd-win\\usbipd.exe') { 'C:\\Program Files\\usbipd-win\\usbipd.exe' } else { 'not found' }"
       register: usbipd_check
       changed_when: false
       failed_when: false
@@ -100,7 +101,8 @@
 
     - name: WSL - Check if winget is available for usbipd installation
       ansible.builtin.shell: |
-        /mnt/c/Windows/System32/cmd.exe /c "where winget" 2>/dev/null || echo "not found"
+        # Use PowerShell to check for winget to avoid UNC path issues with cmd.exe
+        /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { 'winget available' } else { 'not found' }"
       register: usbipd_winget_check
       changed_when: false
       failed_when: false
@@ -118,7 +120,7 @@
       when: 
         - usbipd_check.stdout == "not found" or "usbipd" not in usbipd_check.stdout
         - usbipd_winget_check is succeeded
-        - usbipd_winget_check.stdout != "not found" and "winget" in usbipd_winget_check.stdout
+        - usbipd_winget_check.stdout != "not found" and "winget available" in usbipd_winget_check.stdout
         - sysinit_wsl_install_usbipd | default(true)
       register: usbipd_install
       changed_when: usbipd_install.rc == 0
@@ -132,7 +134,8 @@
 
     - name: WSL - Verify usbipd-win installation
       ansible.builtin.shell: |
-        /mnt/c/Windows/System32/cmd.exe /c "where usbipd"
+        # Try to find usbipd using PowerShell to avoid UNC path issues with cmd.exe
+        /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "if (Test-Path 'C:\\Program Files\\usbipd-win\\usbipd.exe') { 'C:\\Program Files\\usbipd-win\\usbipd.exe' } else { exit 1 }"
       register: usbipd_verify
       changed_when: false
       when: usbipd_install is defined and usbipd_install is changed

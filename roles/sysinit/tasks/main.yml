@@ -43,12 +43,15 @@
     - item in ['mise', 'docker', 'aws-ssm', 'chrome', 'dbeaver', 'opass', 'postman', 'slack', 'gsudo']
   tags: [system]
 
+- name: Configure system-level user profiles
+  ansible.builtin.include_tasks: "user-profiles.yml"
+  tags: [system]
+
 # =============================================================================
 # REACH TAG - Company-specific configuration
 # =============================================================================
 - name: Install reach configuration
   ansible.builtin.include_tasks: "tools/reach.yml"
-  when: "'reach' in sysinit_combined_tools | default([])"
   tags: [reach]
 
 # =============================================================================
@@ -56,5 +59,4 @@
 # =============================================================================
 - name: Install WSL configuration
   ansible.builtin.include_tasks: "tools/wsl.yml"
-  when: "'wsl' in sysinit_combined_tools | default([])"
   tags: [wsl]

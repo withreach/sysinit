@@ -9,7 +9,4 @@
   roles:
     - role: sysinit
       tags:
-        - all
-        - setup
-        - system
         - sysinit
