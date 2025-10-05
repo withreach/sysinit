@@ -167,7 +167,7 @@ setup_git_config() {
   GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || true)}"
   GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
 
-  # Use default values if still empty instead of prompting
+  # create default git credentials
   if [ -z "$GIT_USER_NAME" ]; then
     GIT_USER_NAME="${USER:-$(whoami)}"
   fi
@@ -184,7 +184,6 @@ setup_git_config() {
   export GIT_USER_EMAIL
 }
 
-# Setup SSH agent for GitHub access
 # Setup SSH agent for GitHub access
 setup_ssh_agent() {
   local ssh_env="$HOME/.ssh/agent-env"
@@ -364,6 +363,15 @@ setup_ssh_agent() {
     fi
   fi
 
+  # Check if any keys were found
+  if [ "$keys_found" = false ]; then
+    echo "No SSH keys found in ~/.ssh/"
+    echo "Please generate an SSH key pair:"
+    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
+    echo "Then run this script again."
+    exit 1
+  fi
+
   # Final verification that we have working SSH keys
   if ! ssh-add -l >/dev/null 2>&1; then
     echo "❌ Error: SSH agent is running but no keys are loaded"
@@ -378,7 +386,6 @@ setup_ssh_agent() {
   export SSH_AUTH_SOCK
   export SSH_AGENT_PID
 }
-
 
 # Main execution with better error handling
 main() {
