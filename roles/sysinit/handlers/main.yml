@@ -1,32 +1,32 @@
 ---
-- name: reload systemd daemon
+- name: Reload systemd daemon
   ansible.builtin.systemd:
     daemon_reload: true
   become: true
   listen: "reload systemd"
 
-- name: restart ssh service
+- name: Restart SSH service
   ansible.builtin.service:
     name: "{{ ssh_service_name | default('sshd') }}"
     state: restarted
   become: true
   listen: "restart ssh"
 
-- name: reload ssh config
+- name: Reload SSH config
   ansible.builtin.meta: noop
   listen: "reload ssh config"
 
-# General headers
-- name: restart docker
+# General service handlers
+- name: Restart Docker service
   ansible.builtin.service:
     name: docker
     state: restarted
   become: true
   listen: "restart docker"
 
-- name: reload profile
+- name: Reload user profile
   ansible.builtin.shell:
-    cmd: "source {{ lookup('env', 'HOME') }}/.bashrc"
+    cmd: "source {{ sysinit_user_home }}/.bashrc"
   become: false
   listen: "reload profile"
 
@@ -39,7 +39,7 @@
   when: sysinit_reach_selinux_enabled | bool
   listen: "restore selinux contexts"
 
-- name: reload reach repositories
+- name: Reload reach repositories
   ansible.builtin.command:
     cmd: "{{ sysinit_reach_repo_script }} dev"
     chdir: "{{ sysinit_reach_base_dir }}"
@@ -49,7 +49,7 @@
     SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
   listen: "reload repositories"
 
-- name: update reach git repositories
+- name: Update reach git repositories
   ansible.builtin.git:
     repo: "{{ item.repo }}"
     dest: "{{ item.dest }}"
@@ -66,7 +66,7 @@
     SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
   listen: "update git repositories"
 
-- name: validate hosts file
+- name: Validate hosts file
   ansible.builtin.command:
     cmd: "getent hosts {{ item }}"
   loop: "{{ sysinit_reach_dev_hosts }}"
@@ -74,7 +74,7 @@
   failed_when: false
   listen: "validate hosts"
 
-- name: backup reach configuration
+- name: Backup reach configuration
   ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}.backup.{{ ansible_date_time.epoch }}"

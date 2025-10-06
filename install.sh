@@ -167,13 +167,14 @@ setup_git_config() {
   GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || true)}"
   GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
 
-  # Use default values if still empty instead of prompting
+  # create default git credentials
   if [ -z "$GIT_USER_NAME" ]; then
     GIT_USER_NAME="${USER:-$(whoami)}"
   fi
 
   if [ -z "$GIT_USER_EMAIL" ]; then
-    local hostname=$(hostname 2>/dev/null || echo "localhost")
+    local hostname
+    hostname=$(hostname 2>/dev/null || echo "localhost")
     GIT_USER_EMAIL="${USER:-$(whoami)}@${hostname}"
   fi
 
@@ -184,7 +185,6 @@ setup_git_config() {
   export GIT_USER_EMAIL
 }
 
-# Setup SSH agent for GitHub access
 # Setup SSH agent for GitHub access
 setup_ssh_agent() {
   local ssh_env="$HOME/.ssh/agent-env"
@@ -259,11 +259,10 @@ setup_ssh_agent() {
   # If we don't have keys loaded, try to load them
   if [ "$keys_loaded" = false ]; then
     echo "🔍 Looking for SSH keys to load..."
-    
+
     # Look for SSH keys to add
     local keys_found=false
     local keys_added=false
-    local found_encrypted=false
 
     for key in ~/.ssh/id_rsa ~/.ssh/id_ed25519 ~/.ssh/id_ecdsa ~/.ssh/id_dsa; do
       if [ -f "$key" ]; then
@@ -280,9 +279,8 @@ setup_ssh_agent() {
           if ssh-keygen -y -f "$key" >/dev/null 2>&1; then
             echo "   ⚠️  Key $key is not encrypted but failed to load"
           else
-            found_encrypted=true
             echo "   🔐 Key $key appears to be encrypted"
-            
+
             # If we have an interactive terminal, try to prompt for passphrase
             if [ "$is_interactive" = true ]; then
               echo "   🔑 Prompting for passphrase..."
@@ -321,7 +319,7 @@ setup_ssh_agent() {
         echo "❌ Could not load any SSH keys, even with interactive prompts."
         echo ""
         echo "This might be due to:"
-        echo "   • Invalid or corrupted key files"  
+        echo "   • Invalid or corrupted key files"
         echo "   • Permission issues"
         echo "   • Incorrect passphrase"
         echo ""
@@ -364,6 +362,15 @@ setup_ssh_agent() {
     fi
   fi
 
+  # Check if any keys were found
+  if [ "$keys_found" = false ]; then
+    echo "No SSH keys found in ~/.ssh/"
+    echo "Please generate an SSH key pair:"
+    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
+    echo "Then run this script again."
+    exit 1
+  fi
+
   # Final verification that we have working SSH keys
   if ! ssh-add -l >/dev/null 2>&1; then
     echo "❌ Error: SSH agent is running but no keys are loaded"
@@ -378,7 +385,6 @@ setup_ssh_agent() {
   export SSH_AUTH_SOCK
   export SSH_AGENT_PID
 }
-
 
 # Main execution with better error handling
 main() {

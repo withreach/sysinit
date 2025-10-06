@@ -3,16 +3,7 @@
 [![Ansible Galaxy](https://img.shields.io/ansible/role/sysinit.svg)](https://galaxy.ansible.com/kedwards/sysinit)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kedwards/sysinit/blob/main/LICENSE)
 
-An Ansible role for system initialization and development environment configuration. This role automates the setup of development environments by cloning required repositories,
-configuring local hosts, setting up pre-commit hooks.
-
-## Purpose
-
-This role is designed to:
-- Initialize and configure development environments
-- Clone and maintain required repositories
-- Set up local development hosts for testing
-- Install and configure pre-commit hooks
+An Ansible role for system initialization and development environment configuration.
 
 ## Requirements
 
@@ -101,36 +92,7 @@ This role has no external role dependencies but requires the following Ansible c
   hosts: localhost
   become: yes
   roles:
-    - reach.sysinit
-```
-
-### With Custom Variables
-```yaml
----
-- name: Initialize Development Environment
-  hosts: localhost
-  become: yes
-  vars:
-    withreach_dir: "/opt/withreach"
-    dev_hosts:
-      - custom.local
-      - api.custom.local
-  roles:
-    - reach.sysinit
-```
-
-### With Tags
-```yaml
----
-- name: Initialize Development Environment
-  hosts: localhost
-  become: yes
-  roles:
-    - reach.sysinit
-  tags:
-    - devops
-    - repos
-    - hosts
+    - sysinit
 ```
 
 ### Command Line Usage
@@ -138,14 +100,11 @@ This role has no external role dependencies but requires the following Ansible c
 # Run the full role
 ansible-playbook -i inventory playbook.yml
 
-# Run specific tasks
-ansible-playbook -i inventory playbook.yml --tags "devops,hosts"
+# Run specific tool installation
+ansible-playbook -i inventory playbook.yml -e tools='chrome dbeaver'
 
 # Check mode (dry run)
 ansible-playbook -i inventory playbook.yml --check
-
-# Skip host modifications
-ansible-playbook -i inventory playbook.yml --skip-tags "hosts"
 
 # Provide Git identity to the playbook
 ansible-playbook -i inventory playbook.yml -K -e "git_user_name=Your Name" -e "git_user_email=you@example.com"

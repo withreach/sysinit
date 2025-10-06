@@ -2,20 +2,11 @@
 # APT-based systems (Ubuntu/Debian)
 - name: Docker - Install (APT)
   when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
-  tags:
-    - docker
-    - install
-    - development
-    - containers
   block:
     - name: Docker - Check if docker GPG keyring exists
       ansible.builtin.stat:
         path: /etc/apt/keyrings/docker.gpg
       register: docker_keyring_exists
-      tags:
-        - docker
-        - security
-        - setup
 
     - name: Docker - Add docker official GPG key
       ansible.builtin.get_url:
@@ -24,39 +15,23 @@
         mode: '0644'
       register: docker_gpg_download
       when: not docker_keyring_exists.stat.exists
-      tags:
-        - docker
-        - security
-        - download
 
     - name: Docker - Import docker GPG key
       ansible.builtin.command:
         cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /tmp/docker.gpg
         creates: /etc/apt/keyrings/docker.gpg
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is succeeded
-      tags:
-        - docker
-        - security
-        - setup
 
     - name: Docker - Remove temporary GPG key file
       ansible.builtin.file:
         path: /tmp/docker.gpg
         state: absent
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is defined
-      tags:
-        - docker
-        - cleanup
-        - security
 
     - name: Docker - Fix keyring permissions
       ansible.builtin.file:
         path: /etc/apt/keyrings/docker.gpg
         mode: a+r
-      tags:
-        - docker
-        - security
-        - permissions
 
     - name: Docker - Add docker repository
       ansible.builtin.apt_repository:
@@ -65,10 +40,6 @@
           https://download.docker.com/linux/{{ ansible_distribution | lower }}/
           {{ ansible_distribution_release }} stable
         state: present
-      tags:
-        - docker
-        - setup
-        - repositories
 
     - name: Docker - Install
       ansible.builtin.apt:
@@ -79,20 +50,10 @@
           - docker-ce
           - docker-ce-cli
           - docker-compose-plugin
-      tags:
-        - docker
-        - install
-        - packages
-        - core
 
 # DNF-based systems (Fedora)
 - name: Docker - Install (Fedora)
   when: ansible_distribution == 'Fedora'
-  tags:
-    - docker
-    - install
-    - development
-    - containers
   block:
     - name: Docker - Add Docker repository
       ansible.builtin.yum_repository:
@@ -102,10 +63,6 @@
         enabled: true
         gpgcheck: true
         gpgkey: https://download.docker.com/linux/fedora/gpg
-      tags:
-        - docker
-        - setup
-        - repositories
 
     - name: Docker - Install
       ansible.builtin.dnf:
@@ -117,43 +74,19 @@
           - docker-ce-cli
           - docker-compose-plugin
         state: present
-      tags:
-        - docker
-        - install
-        - packages
-        - core
 
 - name: Docker - Add docker group
   ansible.builtin.group:
     name: docker
     state: present
-  tags:
-    - docker
-    - setup
-    - users
-    - permissions
 
 - name: Docker - Configure user
   ansible.builtin.user:
-    name: "{{ user_item }}"
+    name: "{{ sysinit_user }}"
     groups: docker
     append: true
-  loop_control:
-    loop_var: user_item
-  loop:
-    - "{{ lookup('env', 'USER') }}"
-  tags:
-    - docker
-    - setup
-    - users
-    - permissions
 
 - name: Docker - Install docker completion
-  tags:
-    - docker
-    - configure
-    - completion
-    - optional
   block:
     - name: Docker - Get completion script content for checksum calculation
       ansible.builtin.uri:
@@ -161,19 +94,11 @@
         method: GET
         return_content: true
       register: docker_completion_content
-      tags:
-        - docker
-        - download
-        - completion
 
     - name: Docker - Calculate checksum of completion script
       ansible.builtin.set_fact:
         docker_completion_sha256: "{{ docker_completion_content.content | hash('sha256') }}"
       when: docker_completion_content is succeeded
-      tags:
-        - docker
-        - security
-        - completion
 
     - name: Docker - Download completion script
       ansible.builtin.get_url:
@@ -181,8 +106,3 @@
         dest: /etc/bash_completion.d/docker.sh
         mode: +x
         checksum: "{{ 'sha256:' + docker_completion_sha256 if docker_completion_sha256 is defined else omit }}"
-      tags:
-        - docker
-        - install
-        - completion
-        - configure

@@ -1,8 +1,6 @@
 ---
-sysinit_distro_packages:
-  - docker
-  - docker-compose
-  - docker-buildx
+sysinit_distro_packages: []
 
 sysinit_tools:
   - aws-ssm
+  - docker
