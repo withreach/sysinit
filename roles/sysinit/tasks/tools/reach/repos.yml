@@ -20,7 +20,7 @@
         version: "{{ sysinit_reach_devops_repo_branch }}"
         update: false
         accept_hostkey: true
-        key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_rsa"
+        key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
       register: devops_clone_result
       become: false
       environment:
