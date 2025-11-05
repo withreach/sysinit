@@ -143,6 +143,15 @@ setup_python_env() {
 
   # Only create venv if it doesn't exist or if sysinit package isn't installed
   if [[ ! -d ".venv" ]] || ! .venv/bin/python -c "import sysinit" 2>/dev/null; then
+    # Fix ownership before attempting to recreate .venv
+    if [[ -d ".venv" ]]; then
+      echo "🔧 Fixing .venv ownership before recreation..."
+      sudo chown -R "$USER:$USER" ".venv" 2>/dev/null || {
+        echo "⚠️  Could not fix ownership, removing .venv manually..."
+        sudo rm -rf ".venv"
+      }
+    fi
+    
     uv venv --clear
     # shellcheck disable=SC1091
     source ".venv/bin/activate"
