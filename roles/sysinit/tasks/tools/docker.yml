@@ -18,8 +18,8 @@
 
     - name: Docker - Import docker GPG key
       ansible.builtin.command:
-        cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /tmp/docker.gpg
-        creates: /etc/apt/keyrings/docker.gpg
+        cmd: gpg --dearmor -o /etc/apt/keyrings/docker.asc /tmp/docker.gpg
+        creates: /etc/apt/keyrings/docker.asc
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is succeeded
 
     - name: Docker - Remove temporary GPG key file
@@ -30,13 +30,13 @@
 
     - name: Docker - Fix keyring permissions
       ansible.builtin.file:
-        path: /etc/apt/keyrings/docker.gpg
+        path: /etc/apt/keyrings/docker.asc
         mode: a+r
 
     - name: Docker - Add docker repository
       ansible.builtin.apt_repository:
         repo: >
-          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg]
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
           https://download.docker.com/linux/{{ ansible_distribution | lower }}/
           {{ ansible_distribution_release }} stable
         state: present
