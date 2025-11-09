@@ -10,14 +10,12 @@
           - assume
           - curl
           - docker
-          - gh
           - git
           - gpg
           - granted
           - jq
           - mise
           - node
-          - op
           - python
           - starship
 
