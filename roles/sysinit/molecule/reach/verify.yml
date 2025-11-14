@@ -67,6 +67,7 @@
     - name: Test repository script execution
       ansible.builtin.command:
         cmd: "{{ reach_base }}/bin/getRepos.sh"
+      become: true
       become_user: "{{ test_user }}"
       register: script_output
       changed_when: false
@@ -85,7 +86,7 @@
       ansible.builtin.command:
         cmd: "ls -Z {{ reach_base }}"
       register: selinux_check
-      when: 
+      when:
         - ansible_selinux is defined
         - ansible_selinux.status == "enabled"
       changed_when: false

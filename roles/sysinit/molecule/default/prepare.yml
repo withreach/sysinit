@@ -53,6 +53,13 @@
       ansible.builtin.raw: pip3 install --break-system-packages github3.py
       register: install_github3
       changed_when: install_github3.rc == 0
+      when: initial_distribution == 'debian' or initial_distribution == 'arch'
+
+    - name: Install github3.py library
+      ansible.builtin.raw: pip3 install github3.py
+      register: install_github3
+      changed_when: install_github3.rc == 0
+      when: initial_distribution == 'fedora' or initial_distribution == 'ubuntu'
 
     - name: Gather facts after Python installation
       ansible.builtin.setup:
@@ -70,7 +77,7 @@
       ansible.builtin.file:
         path: "/home/{{ lookup('env', 'USER') }}/.ssh"
         state: directory
-        mode: '0755'
+        mode: "0755"
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
         recurse: true
@@ -79,7 +86,7 @@
       ansible.builtin.file:
         path: "/home/{{ lookup('env', 'USER') }}/.local/bin"
         state: directory
-        mode: '0755'
+        mode: "0755"
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
         recurse: true

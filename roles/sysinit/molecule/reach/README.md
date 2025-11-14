@@ -97,14 +97,14 @@ sysinit_var: molecule_converge  # Skip git operations in containers
 
 ## Expected Outcomes
 
-✅ **SSH Configuration**: Keys generated with proper permissions  
-✅ **Repository Setup**: Mock repository structure created  
-✅ **Hosts File**: Development hosts added to `/etc/hosts`  
-✅ **Sudo Rules**: Sudoers configuration created and validated  
-✅ **SELinux**: Contexts applied (Fedora only)  
-✅ **User Config**: Profile settings and dotfiles deployed  
-✅ **Idempotency**: No changes on subsequent runs  
-✅ **Tag Selectivity**: Individual components can be run via tags  
+✅ **SSH Configuration**: Keys generated with proper permissions
+✅ **Repository Setup**: Mock repository structure created
+✅ **Hosts File**: Development hosts added to `/etc/hosts`
+✅ **Sudo Rules**: Sudoers configuration created and validated
+✅ **SELinux**: Contexts applied (Fedora only)
+✅ **User Config**: Profile settings and dotfiles deployed
+✅ **Idempotency**: No changes on subsequent runs
+✅ **Tag Selectivity**: Individual components can be run via tags
 
 ## Troubleshooting
 

@@ -8,7 +8,7 @@
       ansible.builtin.include_role:
         name: sysinit
       vars:
-        tools: "reach"
+        sysinit_tools: "reach"
         sysinit_combined_tools:
           - reach
       register: second_run
@@ -25,18 +25,18 @@
         name: sysinit
         tasks_from: tools/reach.yml
       vars:
-        ansible_skip_tags: []
-        ansible_tags: 
+        sysinit_skip_tags: []
+        sysinit_run_tags:
           - reach-ssh
       register: ssh_only_run
 
     - name: Test selective tag execution (Host only)
       ansible.builtin.include_role:
-        name: sysinit  
+        name: sysinit
         tasks_from: tools/reach.yml
       vars:
-        ansible_skip_tags: []
-        ansible_tags:
+        sysinit_skip_tags: []
+        sysinit_run_tags:
           - reach-host
       register: host_only_run
 
@@ -66,6 +66,7 @@
         path: /tmp/test-withreach/dev/.env
         line: "MODIFIED_VAR=modified_value"
         create: true
+        mode: '0644'
       register: config_modified
 
     - name: Verify sudoers file syntax is valid
