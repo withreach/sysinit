@@ -20,6 +20,7 @@ sysinit_mise_plugins:
   - github-cli
   - granted
   - jq
+  - mkcert
   - node
   - pre-commit
   - python@3.11
