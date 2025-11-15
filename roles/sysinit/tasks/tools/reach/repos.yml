@@ -39,11 +39,11 @@
           - Network connectivity issues
      
           Error details:
-            {{ repos_output.stderr }}
+            {{ devops_clone_result.stderr }}
       when:
         - sysinit_var | default('') != 'molecule_converge'
-        - repos_output.rc is defined
-        - repos_output.rc != 0
+        - devops_clone_result.rc is defined
+        - devops_clone_result.rc != 0
 
 - name: Check for new repositories to clone
   ansible.builtin.shell: |
