@@ -62,6 +62,23 @@
     SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
     SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
   when: sysinit_var | default('') != 'molecule_converge'
+  ignore_errors: true
+
+- name: Check for repository clone failures
+  ansible.builtin.fail:
+    msg: |
+      Failed to clone one or more repositories. This typically occurs when:
+      - You do not have access to the repository
+      - Your SSH key is not configured or not loaded in the SSH agent
+      - The repository URL is incorrect or the repository no longer exists
+      - Network connectivity issues
+      
+      Error details:
+      {{ repos_output.stderr }}
+  when:
+    - sysinit_var | default('') != 'molecule_converge'
+    - repos_output.rc is defined
+    - repos_output.rc != 0
 
 - name: Check if pre-commit hook already present
   ansible.builtin.stat:

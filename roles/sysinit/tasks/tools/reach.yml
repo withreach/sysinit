@@ -1,18 +1,4 @@
 ---
-- name: Configure SSH
-  ansible.builtin.include_tasks: "reach/ssh.yml"
-  tags:
-    - reach
-    - reach-ssh
-    - always
-
-- name: Install repositories
-  ansible.builtin.include_tasks: "reach/repos.yml"
-  tags:
-    - reach
-    - reach-repos
-    - always
-
 - name: Configure sudo access
   ansible.builtin.include_tasks: "reach/sudoers.yml"
   tags:
@@ -39,4 +25,18 @@
   tags:
     - reach
     - reach-user
+    - always
+
+- name: Configure SSH
+  ansible.builtin.include_tasks: "reach/ssh.yml"
+  tags:
+    - reach
+    - reach-ssh
+    - always
+
+- name: Install repositories
+  ansible.builtin.include_tasks: "reach/repos.yml"
+  tags:
+    - reach
+    - reach-repos
     - always
