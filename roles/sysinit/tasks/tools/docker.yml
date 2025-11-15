@@ -5,26 +5,26 @@
   block:
     - name: Docker - Check if docker GPG keyring exists
       ansible.builtin.stat:
-        path: /etc/apt/keyrings/docker.gpg
+        path: /etc/apt/keyrings/docker.asc
       register: docker_keyring_exists
 
     - name: Docker - Add docker official GPG key
       ansible.builtin.get_url:
         url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
-        dest: /tmp/docker.gpg
+        dest: /tmp/docker.asc
         mode: "0644"
       register: docker_gpg_download
       when: not docker_keyring_exists.stat.exists
 
     - name: Docker - Import docker GPG key
       ansible.builtin.command:
-        cmd: gpg --dearmor -o /etc/apt/keyrings/docker.asc /tmp/docker.gpg
+        cmd: gpg --dearmor -o /etc/apt/keyrings/docker.asc /tmp/docker.asc
         creates: /etc/apt/keyrings/docker.asc
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is succeeded
 
     - name: Docker - Remove temporary GPG key file
       ansible.builtin.file:
-        path: /tmp/docker.gpg
+        path: /tmp/docker.asc
         state: absent
       when: not docker_keyring_exists.stat.exists and docker_gpg_download is defined
 
