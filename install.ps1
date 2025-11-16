@@ -2,23 +2,22 @@
   Reach Windows Developer Bootstrap
 
   Features:
-    - winget (if missing)
+    - winget
     - Optional dev apps (Git, AWS CLI, VSCode, Slack, Postman, Meld...)
     - WSL enabled + WSL2 default
-    - Ubuntu distro selection (default Ubuntu-24.04)
-    - Auto-install Ubuntu-24.04 when selected
+    - Ddistro selection (default Ubuntu-24.04)
     - Run Reach sysinit bootstrap inside WSL
-    - SSH Sync (Option A): Controlled by -SyncSSHKeys (disabled by default)
+    - SSH Sync, Controlled by -SyncSSHKeys (disabled by default)
     - mkcert install + CA trust
     - rch.local + *.rch.local certificate generation
     - hosts file updates
-    - Windows Terminal Reach profile
 #>
 
 param(
-    [switch]$InstallExtras = $true,
+    [switch]$InstallExtras = $false,
     [string]$WSLDistro = "Ubuntu-24.04",
-    [switch]$SyncSSHKeys = $false    # <--- NEW FLAG
+    [string]$DistroName = "",
+    [switch]$SyncSSHKeys = $false
 )
 
 # ------------------------------#
@@ -37,6 +36,18 @@ Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cya
 Write-Host "Install Extras: $InstallExtras" -ForegroundColor Cyan
 Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
 Write-Host "Sync SSH Keys: $SyncSSHKeys" -ForegroundColor Cyan
+
+# Set the effective distro name 
+# Use custom name if provided, otherwise generate rch-[os] from the distro name
+if ($DistroName) {
+    $EffectiveDistroName = $DistroName
+} else {
+    # Extract OS name from distro (e.g., "Ubuntu-24.04" -> "ubuntu", "Debian" -> "debian")
+    $OsName = ($WSLDistro -split '-')[0].ToLower()
+    $EffectiveDistroName = "rch-$OsName"
+}
+
+Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 
 # ------------------------------#
 # Variables
@@ -127,36 +138,26 @@ function Ensure-WSL {
 Ensure-WSL
 
 # ------------------------------#
-# INSTALL UBUNTU BASED ON FLAG
+# INSTALL DISTRO
 # ------------------------------#
-function Install-Ubuntu {
-    $Distro = $WSLDistro
-
-    $Existing = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$Distro$"
+function Install-distro {
+    $Existing = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
     if ($Existing) {
-        Write-Host "$Distro already installed."
+        Write-Host "$EffectiveDistroName already installed."
         return
     }
 
-    if ($Distro -eq "Ubuntu-24.04") {
-        Write-Host "Installing Ubuntu-24.04..." -ForegroundColor Yellow
-        winget install --silent -e --accept-package-agreements --accept-source-agreements `
-            --id Canonical.Ubuntu.2404
-    }
-    else {
-        Write-Host "Custom distro '$Distro' selected; please install manually." -ForegroundColor Yellow
-        return
-    }
+    wsl.exe --install -d $WSLDistro --name $EffectiveDistroName
 }
 
-Install-Ubuntu
+Install-distro
 
 # ------------------------------#
 # Run sysinit inside WSL
 # ------------------------------#
-Write-Host "`nRunning Reach sysinit inside $WSLDistro..." -ForegroundColor Cyan
+Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
 
-wsl.exe -d $WSLDistro -- bash -c "wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
+wsl.exe -d $EffectiveDistroName -- bash -c "wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
 
 Write-Host "sysinit complete." -ForegroundColor Green
 
@@ -165,15 +166,15 @@ Write-Host "sysinit complete." -ForegroundColor Green
 # =======================================================================
 if ($SyncSSHKeys) {
 
-    Write-Host "`n===== Syncing SSH Keys from Windows → WSL =====" -ForegroundColor Cyan
+    Write-Host "`n===== Syncing SSH Keys from Windows -> WSL =====" -ForegroundColor Cyan
 
     if (!(Test-Path $WinSSH)) {
-        Write-Host "No SSH keys found — creating new ed25519 keys..." -ForegroundColor Yellow
+        Write-Host "No SSH keys found - creating new ed25519 keys..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Force -Path $WinSSH | Out-Null
         ssh-keygen -t ed25519 -f "$WinSSH\id_ed25519" -N ""
     }
 
-    wsl.exe -d $WSLDistro -- bash -c "mkdir -p $WSLSSH && chmod 700 $WSLSSH"
+    wsl.exe -d $EffectiveDistroName -- bash -c "mkdir -p $WSLSSH; chmod 700 $WSLSSH"
 
     $KeyFiles = @(
         "id_rsa", "id_rsa.pub",
@@ -184,18 +185,18 @@ if ($SyncSSHKeys) {
     foreach ($Key in $KeyFiles) {
         $WinKeyPath = Join-Path $WinSSH $Key
         if (Test-Path $WinKeyPath) {
-            Write-Host "Copying $Key → WSL..." -ForegroundColor Cyan
-            wsl.exe -d $WSLDistro -- bash -c "cat > $WSLSSH/$Key" < $WinKeyPath
-            wsl.exe -d $WSLDistro -- bash -c "chmod 600 $WSLSSH/$Key || true"
+            Write-Host "Copying $Key -> WSL..." -ForegroundColor Cyan
+            Get-Content $WinKeyPath -Raw | wsl.exe -d $EffectiveDistroName -- bash -c "cat > $WSLSSH/$Key"
+            wsl.exe -d $EffectiveDistroName -- bash -c 'chmod 600 $WSLSSH/$Key || true'
         }
     }
 
-    wsl.exe -d $WSLDistro -- bash -c "chmod 700 $WSLSSH; chmod 600 $WSLSSH/* 2>/dev/null || true"
+    wsl.exe -d $EffectiveDistroName -- bash -c 'chmod 700 $WSLSSH; chmod 600 $WSLSSH/* 2>/dev/null || true'
 
     Write-Host "SSH key sync complete." -ForegroundColor Green
 }
 else {
-    Write-Host "`nSkipping SSH key sync (--SyncSSHKeys disabled)" -ForegroundColor Yellow
+    Write-Host "`nSkipping SSH key sync (SyncSSHKeys disabled)" -ForegroundColor Yellow
 }
 
 # =======================================================================
@@ -238,35 +239,8 @@ if ($HostsContent -notcontains $HostsMarker) {
     }
 }
 
-# =======================================================================
-# Windows Terminal Profile
-# =======================================================================
-$WTSettingsPath = Join-Path $env:LOCALAPPDATA "Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
-
-if (Test-Path $WTSettingsPath) {
-
-    $WTSettings = Get-Content $WTSettingsPath -Raw | ConvertFrom-Json
-    $ProfileGuid = "{c1b0f0e9-f31a-4b4c-9d73-reach0002404}"
-
-    $Existing = $WTSettings.profiles.list | Where-Object { $_.guid -eq $ProfileGuid }
-
-    if (-not $Existing) {
-        $NewProfile = [ordered]@{
-            name              = "$WSLDistro (Reach)"
-            guid              = $ProfileGuid
-            commandline       = "wsl.exe -d $WSLDistro"
-            startingDirectory = "//wsl$/$WSLDistro/home/$env:USERNAME"
-            hidden            = $false
-            # icon              = "https://raw.githubusercontent.com/withreach/sysinit/main/assets/reach-icon.png"
-        }
-
-        $WTSettings.profiles.list += $NewProfile
-        $WTSettings | ConvertTo-Json -Depth 10 | Set-Content $WTSettingsPath -Encoding utf8
-    }
-}
-
 Write-Host "`n======== DONE ========" -ForegroundColor Green
-Write-Host "WSL distro: $WSLDistro"
+Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
 Write-Host "Extras installed: $InstallExtras"
 Write-Host "Certs: $CertDir"

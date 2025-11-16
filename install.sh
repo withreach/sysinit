@@ -82,19 +82,19 @@ get_packages_for_pm() {
   local pm="$1"
   case "$pm" in
   apt)
-    echo "curl git gpg"
+    echo "curl git gpg wget"
     ;;
   pacman)
-    echo "curl git gnupg"
+    echo "curl git gnupg wget"
     ;;
   yum)
-    echo "curl git gnupg2"
+    echo "curl git gnupg2 wget"
     ;;
   dnf)
-    echo "curl git gnupg2 python3-libdnf5"
+    echo "curl git gnupg2 python3-libdnf5 wget"
     ;;
   *)
-    echo "curl git gnupg"
+    echo "curl git gnupg wget"
     ;;
   esac
 }
