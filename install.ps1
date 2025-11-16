@@ -156,11 +156,7 @@ Install-Ubuntu
 # ------------------------------#
 Write-Host "`nRunning Reach sysinit inside $WSLDistro..." -ForegroundColor Cyan
 
-wsl.exe -d $WSLDistro -- bash -c "
-    sudo apt update -y &&
-    sudo apt install -y wget &&
-    wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
-"
+wsl.exe -d $WSLDistro -- bash -c "wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
 
 Write-Host "sysinit complete." -ForegroundColor Green
 
