@@ -81,20 +81,26 @@ trap cleanup ERR EXIT
 get_packages_for_pm() {
   local pm="$1"
   case "$pm" in
-  apt)
-    echo "curl git gpg wget"
+  apt-get)
+    echo "curl git gpg"
     ;;
   pacman)
-    echo "curl git gnupg wget"
+    echo "curl git gnupg"
     ;;
   yum)
-    echo "curl git gnupg2 wget"
+    echo "curl git gnupg2get"
     ;;
   dnf)
-    echo "curl git gnupg2 python3-libdnf5 wget"
+    echo "curl git gnupg2 python3-libdnf5"
+    ;;
+  zypper)
+    echo "curl git gpg2"
+    ;;
+  apk)
+    echo "curl git gnupg"
     ;;
   *)
-    echo "curl git gnupg wget"
+    echo "curl git gnupg"
     ;;
   esac
 }
@@ -106,6 +112,8 @@ get_package_manager() {
     ["/etc/arch-release"]="pacman"
     ["/etc/debian_version"]="apt"
     ["/etc/fedora-release"]="dnf"
+    ["/etc/SuSE-release"]="zypper"
+    ["/etc/alpine-release"]="apk"
   )
   for f in "${!os_info[@]}"; do
     if [[ -f "$f" ]]; then
@@ -124,12 +132,12 @@ install_packages() {
   packages=$(get_packages_for_pm "$pm")
 
   case "$pm" in
-  apt)
-    sudo apt update
-    sudo apt upgrade -y
+  apt-get)
+    sudo apt-get update
+    sudo apt-get upgrade -y
     # shellcheck disable=SC2086
-    sudo apt install -y $packages
-    sudo apt autoremove -y
+    sudo apt-get install -y $packages
+    sudo apt-get autoremove -y
     ;;
   dnf)
     sudo dnf update -y
@@ -145,6 +153,16 @@ install_packages() {
     sudo yum update -y
     # shellcheck disable=SC2086
     sudo yum install -y $packages
+    ;;
+  zypper)
+    sudo zypper refresh
+    # shellcheck disable=SC2086
+    sudo zypper install -y $packages
+    ;;
+  apk)
+    sudo apk update
+    # shellcheck disable=SC2086
+    sudo apk add --no-cache $packages
     ;;
   *)
     echo "Unsupported or unknown package manager"
