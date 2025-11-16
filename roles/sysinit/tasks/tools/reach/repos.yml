@@ -33,13 +33,13 @@
       ansible.builtin.fail:
         msg: |
           Failed to clone one or more repositories. This typically occurs when:
-          - You do not have access to the repository
-          - Your SSH key is not configured or not loaded in the SSH agent
-          - The repository URL is incorrect or the repository no longer exists
-          - Network connectivity issues
-     
+            - You do not have access to the repository
+            - Your SSH key is not configured or not loaded in the SSH agent
+            - The repository URL is incorrect or the repository no longer exists
+            - Network connectivity issues
+
           Error details:
-            {{ devops_clone_result.stderr }}
+          {{ devops_clone_result.stderr | default('No error details available') }}
       when:
         - sysinit_var | default('') != 'molecule_converge'
         - devops_clone_result.rc is defined
@@ -85,13 +85,13 @@
   ansible.builtin.fail:
     msg: |
       Failed to clone one or more repositories. This typically occurs when:
-      - You do not have access to the repository
-      - Your SSH key is not configured or not loaded in the SSH agent
-      - The repository URL is incorrect or the repository no longer exists
-      - Network connectivity issues
-      
+        - You do not have access to the repository
+        - Your SSH key is not configured or not loaded in the SSH agent
+        - The repository URL is incorrect or the repository no longer exists
+        - Network connectivity issues
+
       Error details:
-      {{ repos_output.stderr }}
+      {{ repos_output.stderr | default('No error details available') }}
   when:
     - sysinit_var | default('') != 'molecule_converge'
     - repos_output.rc is defined
