@@ -32,8 +32,7 @@
 - name: Check for new repositories to clone
   when:
     - sysinit_var | default('') != 'molecule_converge'
-    - devops_clone_result.rc is defined
-    - devops_clone_result.rc != 0
+    - devops_clone_result.failed != true
   block:
     - name: Copy .env example
       ansible.builtin.copy:
@@ -124,3 +123,4 @@
         SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
       when: sysinit_var | default('') != 'molecule_converge'
       ignore_errors: true      
+
