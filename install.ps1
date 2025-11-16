@@ -158,27 +158,7 @@ Install-distro
 Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
 
 # Detect package manager and install wget based on distro
-$installWgetScript = @"
-if command -v apt &> /dev/null; then
-    sudo apt-get update -y && sudo apt-get install -y wget
-elif command -v dnf &> /dev/null; then
-    sudo dnf install -y wget
-elif command -v yum &> /dev/null; then
-    sudo yum install -y wget
-elif command -v pacman &> /dev/null; then
-    sudo pacman -Sy --noconfirm wget
-elif command -v zypper &> /dev/null; then
-    sudo zypper install -y wget
-elif command -v apk &> /dev/null; then
-    sudo apk add --no-cache wget
-else
-    echo 'Unable to detect package manager. Please install wget manually.'
-    exit 1
-fi
-wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
-"@
-
-wsl.exe -d $EffectiveDistroName -- bash -c $installWgetScript
+wsl.exe -d $EffectiveDistroName -- bash -c "if command -v apt-get > /dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y wget; elif command -v dnf > /dev/null 2>&1; then sudo dnf install -y wget; elif command -v yum > /dev/null 2>&1; then sudo yum install -y wget; elif command -v pacman > /dev/null 2>&1; then sudo pacman -Sy --noconfirm wget; elif command -v zypper > /dev/null 2>&1; then sudo zypper install -y wget; elif command -v apk > /dev/null 2>&1; then sudo apk add --no-cache wget; else echo 'Unable to detect package manager. Please install wget manually.'; exit 1; fi && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
 
 Write-Host "sysinit complete." -ForegroundColor Green
 

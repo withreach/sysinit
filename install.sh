@@ -110,7 +110,7 @@ get_package_manager() {
   declare -A os_info=(
     ["/etc/redhat-release"]="yum"
     ["/etc/arch-release"]="pacman"
-    ["/etc/debian_version"]="apt"
+    ["/etc/debian_version"]="apt-get"
     ["/etc/fedora-release"]="dnf"
     ["/etc/SuSE-release"]="zypper"
     ["/etc/alpine-release"]="apk"
