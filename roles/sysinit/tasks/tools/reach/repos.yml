@@ -30,75 +30,11 @@
       ignore_errors: true
 
 - name: Check for new repositories to clone
-  ansible.builtin.shell: |
-    cd {{ sysinit_reach_dev_dir }}
-    REPOS=$(cat repos.txt)
-    NEW_REPOS_FOUND=false
-
-    for R in $REPOS; do
-      if [ ! -d {{ sysinit_reach_repos_dir }}/$R ]; then
-        echo "New repository found: $R"
-        NEW_REPOS_FOUND=true
-      fi
-    done
-
-    if [ "$NEW_REPOS_FOUND" = "true" ]; then
-      echo "NEW_REPOS_TO_CLONE"
-    else
-      echo "ALL_REPOS_EXIST"
-    fi
-  register: repo_check
-  become: false
-  changed_when: false
-  when: sysinit_var | default('') != 'molecule_converge'
-
-- name: Retrieve required repositories
-  ansible.builtin.command: "{{ sysinit_reach_repo_script }} dev"
-  args:
-    chdir: "{{ sysinit_reach_base_dir }}"
-  register: repos_output
-  changed_when: "'NEW_REPOS_TO_CLONE' in repo_check.stdout"
-  become: false
-  environment:
-    SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
-    SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
-  when: sysinit_var | default('') != 'molecule_converge'
-  ignore_errors: true
-
-- name: Check for repository clone failures
-  ansible.builtin.fail:
-    msg: |
-      Failed to clone one or more repositories. This typically occurs when:
-        - You do not have access to the repository
-        - Your SSH key is not configured or not loaded in the SSH agent
-        - The repository URL is incorrect or the repository no longer exists
-        - Network connectivity issues
-
-      Error details:
-      {{ repos_output.stderr | default('No error details available') }}
   when:
     - sysinit_var | default('') != 'molecule_converge'
-    - repos_output.rc is defined
-    - repos_output.rc != 0
-
-- block:
-  when:
-    - sysinit_var | default('') != 'molecule_converge'
-    - repos_output.rc is defined
-    - repos_output.rc != 0
-    - name: Check if pre-commit hook already present
-      ansible.builtin.stat:
-        path: "{{ sysinit_reach_v2_dir }}/.git/hooks/pre-commit"
-      register: hook
-      when: sysinit_var | default('') != 'molecule_converge'
-    
-    # - name: Install pre-commit via pip3
-    #   ansible.builtin.pip:
-    #     name: pre-commit
-    #     state: latest
-    #     executable: pip3
-    #   when: not hook.stat.exists
-
+    - devops_clone_result.rc is defined
+    - devops_clone_result.rc != 0
+  block:
     - name: Copy .env example
       ansible.builtin.copy:
         src: "{{ sysinit_reach_env_example }}"
@@ -139,3 +75,52 @@
       when:
         - sysinit_reach_vscode_settings is not file
         - sysinit_var | default('') != 'molecule_converge'
+    
+    - name: Check if pre-commit hook already present
+      ansible.builtin.stat:
+        path: "{{ sysinit_reach_v2_dir }}/.git/hooks/pre-commit"
+      register: hook
+      when: sysinit_var | default('') != 'molecule_converge'
+
+    # - name: Install pre-commit via pip3
+    #   ansible.builtin.pip:
+    #     name: pre-commit
+    #     state: latest
+    #     executable: pip3
+    #   when: not hook.stat.exists
+
+    - name: Check for new repositories to clone
+      ansible.builtin.shell: |
+        cd {{ sysinit_reach_dev_dir }}
+        REPOS=$(cat repos.txt)
+        NEW_REPOS_FOUND=false
+
+        for R in $REPOS; do
+          if [ ! -d {{ sysinit_reach_repos_dir }}/$R ]; then
+            echo "New repository found: $R"
+            NEW_REPOS_FOUND=true
+          fi
+        done
+
+        if [ "$NEW_REPOS_FOUND" = "true" ]; then
+          echo "NEW_REPOS_TO_CLONE"
+        else
+          echo "ALL_REPOS_EXIST"
+        fi
+      register: repo_check
+      become: false
+      changed_when: false
+      when: sysinit_var | default('') != 'molecule_converge'
+
+    - name: Retrieve required repositories
+      ansible.builtin.command: "{{ sysinit_reach_repo_script }} dev"
+      args:
+        chdir: "{{ sysinit_reach_base_dir }}"
+      register: repos_output
+      changed_when: "'NEW_REPOS_TO_CLONE' in repo_check.stdout"
+      become: false
+      environment:
+        SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
+        SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
+      when: sysinit_var | default('') != 'molecule_converge'
+      ignore_errors: true      
