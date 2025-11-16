@@ -1,5 +1,6 @@
 ---
-sysinit_distro_packages: []
+sysinit_distro_packages:
+  - libatomic
 
 sysinit_tools:
   - aws-ssm
