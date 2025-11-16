@@ -81,7 +81,7 @@ trap cleanup ERR EXIT
 get_packages_for_pm() {
   local pm="$1"
   case "$pm" in
-  apt-get)
+  apt)
     echo "curl git gpg"
     ;;
   pacman)
@@ -110,7 +110,7 @@ get_package_manager() {
   declare -A os_info=(
     ["/etc/redhat-release"]="yum"
     ["/etc/arch-release"]="pacman"
-    ["/etc/debian_version"]="apt-get"
+    ["/etc/debian_version"]="apt"
     ["/etc/fedora-release"]="dnf"
     ["/etc/SuSE-release"]="zypper"
     ["/etc/alpine-release"]="apk"
@@ -132,7 +132,7 @@ install_packages() {
   packages=$(get_packages_for_pm "$pm")
 
   case "$pm" in
-  apt-get)
+  apt)
     sudo apt-get update
     sudo apt-get upgrade -y
     # shellcheck disable=SC2086
