@@ -2,67 +2,38 @@
 - name: Mise - Set mise directory path
   ansible.builtin.set_fact:
     mise_dir: "/home/{{ lookup('env', 'USER') }}/.local/bin"
-  tags:
-    - mise
-    - setup
-    - tools
 
 - name: Mise - Set mise binary path
   ansible.builtin.set_fact:
     mise_bin: "{{ mise_dir }}/mise"
-  tags:
-    - mise
-    - setup
-    - tools
 
 - name: Mise - Check if mise exists
   ansible.builtin.stat:
     path: "{{ mise_bin }}"
   register: mise_exists_result
-  tags:
-    - mise
-    - setup
-    - tools
 
 - name: Mise - Install
   become: true
   become_user: "{{ lookup('env', 'USER') }}"
   when: not mise_exists_result.stat.exists or upgrade | default(false)
-  tags:
-    - mise
-    - install
-    - tools
-    - core
   block:
     - name: Mise - Create local bin directory
       ansible.builtin.file:
         path: "{{ mise_dir }}"
         state: directory
         mode: "0755"
-      tags:
-        - mise
-        - setup
-        - directories
 
     - name: Mise - Import gpg key
       ansible.builtin.shell: >
         gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 0x7413A06D
       args:
         creates: "/home/{{ lookup('env', 'USER') }}/.gnupg/pubring.kbx"
-      tags:
-        - mise
-        - security
-        - setup
 
     - name: Mise - Download signed install script
       ansible.builtin.get_url:
         url: https://mise.jdx.dev/install.sh.sig
         dest: "/tmp/mise-install.sh.sig"
         mode: "0644"
-      tags:
-        - mise
-        - download
-        - install
 
     - name: Mise - Verify and extract install script
       ansible.builtin.shell: >
@@ -70,18 +41,11 @@
       args:
         executable: /bin/bash
         creates: "/tmp/mise-install.sh"
-      tags:
-        - mise
-        - security
-        - install
 
     - name: Mise - Make install script executable
       ansible.builtin.file:
         path: "/tmp/mise-install.sh"
         mode: "0755"
-      tags:
-        - mise
-        - install
 
     - name: Mise - Run install script with correct binary path
       ansible.builtin.shell: >
@@ -89,10 +53,6 @@
         bash /tmp/mise-install.sh
       args:
         creates: "{{ mise_bin }}"
-      tags:
-        - mise
-        - install
-        - core
 
     - name: Mise - Clean up temporary files
       ansible.builtin.file:
@@ -103,38 +63,21 @@
       loop:
         - "/tmp/mise-install.sh.sig"
         - "/tmp/mise-install.sh"
-      tags:
-        - mise
-        - cleanup
-        - install
 
 - name: Mise - Check if mise exists after installation
   ansible.builtin.stat:
     path: "{{ mise_bin }}"
   register: mise_exists_result
-  tags:
-    - mise
-    - verify
-    - tools
 
 - name: Check if mise bin is installed and found.
   ansible.builtin.fail:
     msg: Mise binary cannot be found and is required.
   when: not mise_exists_result.stat.exists
-  tags:
-    - mise
-    - verify
-    - tools
 
 - name: Mise - Install Tools and Plugins
   become: true
   become_user: "{{ lookup('env', 'USER') }}"
   when: mise_exists_result.stat.exists
-  tags:
-    - mise
-    - tools
-    - development
-    - install
   block:
     - name: Mise - Install custom plugins
       ansible.builtin.shell: >
@@ -145,10 +88,6 @@
         loop_var: custom_plugin_item
       loop: "{{ sysinit_mise_custom_plugins }}"
       when: sysinit_mise_custom_plugins is defined and sysinit_mise_custom_plugins | length > 0
-      tags:
-        - mise
-        - plugins
-        - custom
 
     - name: Mise - Get current global config
       ansible.builtin.shell: >
@@ -156,10 +95,6 @@
       register: mise_current_tools
       changed_when: false
       failed_when: false
-      tags:
-        - mise
-        - config
-        - check
 
     - name: Mise - Check which tools need installation
       ansible.builtin.set_fact:
@@ -172,73 +107,11 @@
             {%- endif -%}
           {%- endfor -%}
           {{ missing_tools }}
-      tags:
-        - mise
-        - config
-        - check
 
-    - name: Mise - Display tools to install
-      ansible.builtin.debug:
-        msg: "Tools to install: {{ tools_to_install | join(', ') if tools_to_install | length > 0 else 'None (all tools already configured)' }}"
-      tags:
-        - mise
-        - info
-        - debug
-
-    - name: Mise - Install all missing plugins globally at once
+    - name: Mise - Install tools
       ansible.builtin.shell: >
         {{ mise_bin }} use --global --yes {{ tools_to_install | join(' ') }}
       register: plugin_install_result
       when: tools_to_install | length > 0
       changed_when: plugin_install_result.rc == 0
       failed_when: plugin_install_result.rc != 0 and 'rate limit' not in plugin_install_result.stderr
-      tags:
-        - mise
-        - install
-        - development
-        - aws
-        - tools
-
-    - name: Mise - Verify installation success
-      ansible.builtin.shell: >
-        {{ mise_bin }} current {{ tool_item.split('@')[0] }} >/dev/null 2>&1
-      loop: "{{ sysinit_mise_plugins }}"
-      loop_control:
-        loop_var: tool_item
-      register: tool_verification
-      changed_when: false
-      failed_when: tool_verification.rc != 0
-      when: tools_to_install | length > 0
-      tags:
-        - mise
-        - verify
-        - tools
-
-    - name: Mise - Display installation results
-      ansible.builtin.debug:
-        msg: "Successfully installed and configured {{ tools_to_install | length }} mise tools"
-      when: tools_to_install | length > 0
-      tags:
-        - mise
-        - info
-        - results
-
-    - name: Mise - Show final tool configuration
-      ansible.builtin.shell: >
-        {{ mise_bin }} current
-      register: final_tools_config
-      changed_when: false
-      failed_when: false
-      tags:
-        - mise
-        - info
-        - config
-
-    - name: Mise - Display final configuration
-      ansible.builtin.debug:
-        msg: "Final mise tools configuration:\n{{ final_tools_config.stdout }}"
-      tags:
-        - mise
-        - info
-        - config
-        - results

@@ -3,16 +3,7 @@
 [![Ansible Galaxy](https://img.shields.io/ansible/role/sysinit.svg)](https://galaxy.ansible.com/kedwards/sysinit)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kedwards/sysinit/blob/main/LICENSE)
 
-An Ansible role for system initialization and development environment configuration. This role automates the setup of development environments by cloning required repositories,
-configuring local hosts, setting up pre-commit hooks.
-
-## Purpose
-
-This role is designed to:
-- Initialize and configure development environments
-- Clone and maintain required repositories
-- Set up local development hosts for testing
-- Install and configure pre-commit hooks
+An Ansible role for system initialization and development environment configuration.
 
 ## Requirements
 
@@ -33,6 +24,56 @@ This role is designed to:
 ## Role Variables
 
 All variables are defined in `defaults/main.yml` and can be overridden:
+
+
+## Dependencies
+
+This role has no external role dependencies but requires the following Ansible collections:
+- `ansible.posix`
+- `community.general`
+- `community.docker` (if using Docker-related tasks)
+
+## Usage Example
+
+### Basic Playbook
+```yaml
+---
+- name: Initialize Development Environment
+  hosts: localhost
+  become: yes
+  roles:
+    - sysinit
+```
+
+### Command Line Usage
+```bash
+# Run the full role
+ansible-playbook -i inventory playbook.yml
+
+# Run specific tool installation
+ansible-playbook -i inventory playbook.yml -e tools='chrome dbeaver'
+
+# Check mode (dry run)
+ansible-playbook -i inventory playbook.yml --check
+
+# Provide Git identity to the playbook
+ansible-playbook -i inventory playbook.yml -K -e "git_user_name=Your Name" -e "git_user_email=you@example.com"
+```
+
+**Note:** If you use the top-level `install.sh`, you can instead export:
+```bash
+export GIT_USER_NAME="Your Name"
+export GIT_USER_EMAIL="you@example.com"
+```
+The installer will pass these values into Ansible for you.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test with distributions
+5. Submit a pull request
 
 ### Directory Configuration
 ```yaml
@@ -84,84 +125,3 @@ dev_hosts:
   - stash.rch.local
   - redirect.rch.local
 ```
-
-## Dependencies
-
-This role has no external role dependencies but requires the following Ansible collections:
-- `ansible.posix`
-- `community.general`
-- `community.docker` (if using Docker-related tasks)
-
-## Usage Example
-
-### Basic Playbook
-```yaml
----
-- name: Initialize Development Environment
-  hosts: localhost
-  become: yes
-  roles:
-    - reach.sysinit
-```
-
-### With Custom Variables
-```yaml
----
-- name: Initialize Development Environment
-  hosts: localhost
-  become: yes
-  vars:
-    withreach_dir: "/opt/withreach"
-    dev_hosts:
-      - custom.local
-      - api.custom.local
-  roles:
-    - reach.sysinit
-```
-
-### With Tags
-```yaml
----
-- name: Initialize Development Environment
-  hosts: localhost
-  become: yes
-  roles:
-    - reach.sysinit
-  tags:
-    - devops
-    - repos
-    - hosts
-```
-
-### Command Line Usage
-```bash
-# Run the full role
-ansible-playbook -i inventory playbook.yml
-
-# Run specific tasks
-ansible-playbook -i inventory playbook.yml --tags "devops,hosts"
-
-# Check mode (dry run)
-ansible-playbook -i inventory playbook.yml --check
-
-# Skip host modifications
-ansible-playbook -i inventory playbook.yml --skip-tags "hosts"
-
-# Provide Git identity to the playbook
-ansible-playbook -i inventory playbook.yml -K -e "git_user_name=Your Name" -e "git_user_email=you@example.com"
-```
-
-**Note:** If you use the top-level `install.sh`, you can instead export:
-```bash
-export GIT_USER_NAME="Your Name"
-export GIT_USER_EMAIL="you@example.com"
-```
-The installer will pass these values into Ansible for you.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with distributions
-5. Submit a pull request

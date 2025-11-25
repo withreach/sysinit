@@ -52,4 +52,4 @@
   when:
     - sysinit_reach_selinux_enabled | bool
     - sysinit_var | default('') != 'molecule_converge'
-  ignore_errors: true  # Some booleans might not exist on all systems
+  failed_when: false  # Some booleans might not exist on all systems

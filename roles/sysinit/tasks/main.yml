@@ -1,60 +1,38 @@
 ---
-# =============================================================================
-# SYSINIT MAIN TASKS - Three Tag System: system, reach, wsl
-# =============================================================================
+- name: Set user configuration
+  ansible.builtin.set_fact:
+    sysinit_user: "{{ lookup('env', 'USER') }}"
+    sysinit_user_home: "{{ lookup('env', 'HOME') }}"
 
 - name: Display system info
   ansible.builtin.debug:
     msg:
-      - "User: {{ lookup('env', 'USER') }}"
-      - "Home: {{ lookup('env', 'HOME') }}"
-      - "System: {{ ansible_system }}"
-      - "Architecture: {{ ansible_userspace_architecture }}"
-      - "OS Family: {{ ansible_os_family }}"
-      - "Distribution: {{ ansible_distribution }}"
-      - "Release: {{ ansible_distribution_release }}"
+      - "User: {{ sysinit_user }}"
+      - "Home: {{ sysinit_user_home }}"
+      - "System: {{ ansible_facts['system'] }}"
+      - "Architecture: {{ ansible_facts['architecture'] }}"
+      - "OS Family: {{ ansible_facts['os_family'] }}"
+      - "Distribution: {{ ansible_facts['distribution'] }}"
+      - "Release: {{ ansible_facts['distribution_release'] }}"
       - "Sysinit: {{ sysinit_var }}"
-  tags: [always]
 
 - name: Load distribution variables
-  ansible.builtin.include_vars: "{{ ansible_distribution }}.yml"
-  tags: [always]
+  ansible.builtin.include_vars: "{{ ansible_facts['distribution'] }}.yml"
 
 - name: Combine tools lists
   ansible.builtin.set_fact:
-    sysinit_combined_tools: "{{ (sysinit_sys_tools | default([])) + (sysinit_tools | default([])) + (tools | default('') | split(',')) | select('match', '.+') | list }}"
-  tags: [always]
+    sysinit_combined_tools: >
+      {{ (sysinit_tools | default([])) +
+         (sysinit_sys_tools | default([])) +
+         (tools | default('') | split(',')) |
+         select('match', '.+') | list }}
 
-# =============================================================================
-# SYSTEM TAG - Core system packages and basic development tools
-# =============================================================================
 - name: Install system packages
   ansible.builtin.package:
     name: "{{ sysinit_packages + sysinit_distro_packages | default([]) }}"
     state: present
-  tags: [system]
 
 - name: Install system tools
   ansible.builtin.include_tasks: "tools/{{ item }}.yml"
   loop: "{{ sysinit_combined_tools | default([]) }}"
-  when: 
-    - sysinit_combined_tools is defined
-    - sysinit_combined_tools | length > 0
-    - item in ['mise', 'docker', 'aws-ssm', 'chrome', 'dbeaver', 'opass', 'postman', 'slack', 'gsudo']
-  tags: [system]
-
-# =============================================================================
-# REACH TAG - Company-specific configuration
-# =============================================================================
-- name: Install reach configuration
-  ansible.builtin.include_tasks: "tools/reach.yml"
-  when: "'reach' in sysinit_combined_tools | default([])"
-  tags: [reach]
-
-# =============================================================================
-# WSL TAG - WSL-specific configuration and tools
-# =============================================================================
-- name: Install WSL configuration
-  ansible.builtin.include_tasks: "tools/wsl.yml"
-  when: "'wsl' in sysinit_combined_tools | default([])"
-  tags: [wsl]
+  when: sysinit_combined_tools is defined and sysinit_combined_tools | length > 0

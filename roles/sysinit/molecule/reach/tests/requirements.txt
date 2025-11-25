@@ -1,0 +1,17 @@
+# Python test dependencies for reach molecule scenario
+# Install with: pip install -r requirements.txt
+
+# Core testing frameworks
+pytest>=7.0.0
+testinfra>=9.0.0
+
+# Molecule for Ansible testing
+molecule>=6.0.0
+molecule-docker>=2.0.0
+
+# Ansible
+ansible>=2.15.0
+ansible-core>=2.15.0
+
+# Additional utilities
+pytest-testinfra>=9.0.0

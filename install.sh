@@ -2,8 +2,69 @@
 
 set -euo pipefail
 
+PROMPT_COMMAND="${PROMPT_COMMAND:-}"
 SYSINIT_REPO=https://github.com/withreach/sysinit.git
 script_dir="$HOME/sysinit"
+
+# Default flag values
+ENABLE_SSH_SETUP=false
+
+# Display usage information
+usage() {
+  cat << EOF
+Usage: $0 [OPTIONS]
+
+Install and configure system using sysinit repository.
+
+OPTIONS:
+  -s, --enable-ssh   Enable SSH agent setup (disabled by default)
+  -h, --help         Display this help message
+
+EXAMPLES:
+  # Install without SSH setup (default)
+  $0
+
+  # Install with SSH setup enabled
+  $0 --enable-ssh
+  $0 -s
+
+  # Download and run with SSH setup enabled
+  wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash -s -- --enable-ssh
+
+EOF
+}
+
+# Parse command line arguments
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -s|--enable-ssh)
+        ENABLE_SSH_SETUP=true
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        echo "Unknown option: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# Fix ownership of .venv directory and contents
+fix_venv_ownership() {
+  if [[ -d "$script_dir/.venv" ]]; then
+    echo "🔧 Fixing .venv ownership..."
+    # Fix ownership of .venv directory and all its contents
+    sudo chown -R "$USER:$USER" "$script_dir/.venv" 2>/dev/null || {
+      echo "⚠️  Warning: Could not fix .venv ownership, but continuing..."
+    }
+  fi
+}
 
 cleanup() {
   if command -v deactivate >/dev/null; then
@@ -11,6 +72,8 @@ cleanup() {
   fi
   # Only clean up temp files, preserve .venv for idempotency
   rm -rf "${mise_installer:-/tmp}/mise_install.sh" || true
+  # Fix .venv ownership if it exists
+  fix_venv_ownership
 }
 trap cleanup ERR EXIT
 
@@ -25,10 +88,16 @@ get_packages_for_pm() {
     echo "curl git gnupg"
     ;;
   yum)
-    echo "curl git gnupg2"
+    echo "curl git gnupg2get"
     ;;
   dnf)
     echo "curl git gnupg2 python3-libdnf5"
+    ;;
+  zypper)
+    echo "curl git gpg2"
+    ;;
+  apk)
+    echo "curl git gnupg"
     ;;
   *)
     echo "curl git gnupg"
@@ -43,6 +112,8 @@ get_package_manager() {
     ["/etc/arch-release"]="pacman"
     ["/etc/debian_version"]="apt"
     ["/etc/fedora-release"]="dnf"
+    ["/etc/SuSE-release"]="zypper"
+    ["/etc/alpine-release"]="apk"
   )
   for f in "${!os_info[@]}"; do
     if [[ -f "$f" ]]; then
@@ -62,22 +133,36 @@ install_packages() {
 
   case "$pm" in
   apt)
-    sudo apt update
-    sudo apt upgrade -y
-    sudo apt install -y $packages
-    sudo apt autoremove -y
+    sudo apt-get update
+    sudo apt-get upgrade -y
+    # shellcheck disable=SC2086
+    sudo apt-get install -y $packages
+    sudo apt-get autoremove -y
     ;;
   dnf)
     sudo dnf update -y
+    # shellcheck disable=SC2086
     sudo dnf install -y $packages
     ;;
   pacman)
     sudo pacman -Syu --noconfirm
+    # shellcheck disable=SC2086
     sudo pacman -S --noconfirm $packages
     ;;
   yum)
     sudo yum update -y
+    # shellcheck disable=SC2086
     sudo yum install -y $packages
+    ;;
+  zypper)
+    sudo zypper refresh
+    # shellcheck disable=SC2086
+    sudo zypper install -y $packages
+    ;;
+  apk)
+    sudo apk update
+    # shellcheck disable=SC2086
+    sudo apk add --no-cache $packages
     ;;
   *)
     echo "Unsupported or unknown package manager"
@@ -143,10 +228,19 @@ setup_python_env() {
 
   # Only create venv if it doesn't exist or if sysinit package isn't installed
   if [[ ! -d ".venv" ]] || ! .venv/bin/python -c "import sysinit" 2>/dev/null; then
+    # Fix ownership before attempting to recreate .venv
+    if [[ -d ".venv" ]]; then
+      echo "🔧 Fixing .venv ownership before recreation..."
+      sudo chown -R "$USER:$USER" ".venv" 2>/dev/null || {
+        echo "⚠️  Could not fix ownership, removing .venv manually..."
+        sudo rm -rf ".venv"
+      }
+    fi
+
     uv venv --clear
     # shellcheck disable=SC1091
     source ".venv/bin/activate"
-    uv pip install -e .
+    uv pip install -r requirements.txt
   else
     # shellcheck disable=SC1091
     source ".venv/bin/activate"
@@ -167,13 +261,14 @@ setup_git_config() {
   GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || true)}"
   GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
 
-  # Use default values if still empty instead of prompting
+  # create default git credentials
   if [ -z "$GIT_USER_NAME" ]; then
     GIT_USER_NAME="${USER:-$(whoami)}"
   fi
 
   if [ -z "$GIT_USER_EMAIL" ]; then
-    local hostname=$(hostname 2>/dev/null || echo "localhost")
+    local hostname
+    hostname=$(hostname 2>/dev/null || echo "localhost")
     GIT_USER_EMAIL="${USER:-$(whoami)}@${hostname}"
   fi
 
@@ -184,7 +279,6 @@ setup_git_config() {
   export GIT_USER_EMAIL
 }
 
-# Setup SSH agent for GitHub access
 # Setup SSH agent for GitHub access
 setup_ssh_agent() {
   local ssh_env="$HOME/.ssh/agent-env"
@@ -259,11 +353,10 @@ setup_ssh_agent() {
   # If we don't have keys loaded, try to load them
   if [ "$keys_loaded" = false ]; then
     echo "🔍 Looking for SSH keys to load..."
-    
+
     # Look for SSH keys to add
     local keys_found=false
     local keys_added=false
-    local found_encrypted=false
 
     for key in ~/.ssh/id_rsa ~/.ssh/id_ed25519 ~/.ssh/id_ecdsa ~/.ssh/id_dsa; do
       if [ -f "$key" ]; then
@@ -280,9 +373,8 @@ setup_ssh_agent() {
           if ssh-keygen -y -f "$key" >/dev/null 2>&1; then
             echo "   ⚠️  Key $key is not encrypted but failed to load"
           else
-            found_encrypted=true
             echo "   🔐 Key $key appears to be encrypted"
-            
+
             # If we have an interactive terminal, try to prompt for passphrase
             if [ "$is_interactive" = true ]; then
               echo "   🔑 Prompting for passphrase..."
@@ -321,7 +413,7 @@ setup_ssh_agent() {
         echo "❌ Could not load any SSH keys, even with interactive prompts."
         echo ""
         echo "This might be due to:"
-        echo "   • Invalid or corrupted key files"  
+        echo "   • Invalid or corrupted key files"
         echo "   • Permission issues"
         echo "   • Incorrect passphrase"
         echo ""
@@ -364,6 +456,15 @@ setup_ssh_agent() {
     fi
   fi
 
+  # Check if any keys were found
+  if [ "$keys_found" = false ]; then
+    echo "No SSH keys found in ~/.ssh/"
+    echo "Please generate an SSH key pair:"
+    echo "  ssh-keygen -t ed25519 -C \"email@tld\""
+    echo "Then run this script again."
+    exit 1
+  fi
+
   # Final verification that we have working SSH keys
   if ! ssh-add -l >/dev/null 2>&1; then
     echo "❌ Error: SSH agent is running but no keys are loaded"
@@ -379,14 +480,24 @@ setup_ssh_agent() {
   export SSH_AGENT_PID
 }
 
-
 # Main execution with better error handling
 main() {
+  # Parse command line arguments
+  parse_args "$@"
+
   install_packages
   install_mise
   sync_repo
   setup_git_config
-  setup_ssh_agent
+
+  # Conditionally run SSH setup based on flag
+  if [[ "$ENABLE_SSH_SETUP" == "true" ]]; then
+    echo "🔑 Setting up SSH agent..."
+    setup_ssh_agent
+  else
+    echo "⏭️  Skipping SSH agent setup (use --enable-ssh to enable)"
+  fi
+
   setup_python_env
   run_ansible
 }

@@ -5,7 +5,6 @@ sysinit_force_update: false
 sysinit_packages:
   - gcc
   - make
-  - stow
   - unzip
   - xclip
   - xsel
@@ -16,13 +15,14 @@ sysinit_sys_tools:
   - reach
 
 sysinit_mise_plugins:
-  - 1password-cli
   - amazon-ecr-credential-helper
   - awscli
   - github-cli
   - granted
   - jq
+  - mkcert
   - node
+  - pre-commit
   - python@3.11
   - starship
   - usage
