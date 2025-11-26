@@ -1,5 +1,5 @@
 ---
-- name: Docker - Install on Debian/Ubuntu
+- name: Docker - Install on (Debian/Ubuntu)
   when: ansible_facts['distribution'] == 'Debian' or ansible_facts['distribution'] == 'Ubuntu'
   block:
     - name: Ensure required packages exist
@@ -53,8 +53,8 @@
           - docker-compose-plugin
           - bash-completion
 
-- name: Docker - Install on Fedora
-  when: ansible_facts['distribution'] == 'Fedora'
+- name: Docker - Install on (Fedora/CentOS)
+  when: ansible_facts['distribution'] == 'Fedora' or ansible_facts['distribution'] == 'CentOS'
   block:
     - name: Ensure dnf plugins installed
       ansible.builtin.dnf:

@@ -88,3 +88,10 @@ sysinit_reach_selinux_contexts:
 
 # AWS configuration
 sysinit_aws_sso_role_suffix: "dev"
+
+# Tool installation paths
+sysinit_local_bin: "{{ lookup('env', 'HOME') }}/.local/bin"
+sysinit_applications_dir: "/usr/share/applications"
+
+# AUR user for Arch Linux (used for AUR package installations)
+aur_user: "{{ lookup('env', 'USER') }}"

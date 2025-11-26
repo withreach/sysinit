@@ -32,7 +32,7 @@
     name: "{{ sysinit_packages + sysinit_distro_packages | default([]) }}"
     state: present
 
-- name: Install system tools
+- name: Install tools
   ansible.builtin.include_tasks: "tools/{{ item }}.yml"
   loop: "{{ sysinit_combined_tools | default([]) }}"
   when: sysinit_combined_tools is defined and sysinit_combined_tools | length > 0

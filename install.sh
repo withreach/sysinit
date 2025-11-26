@@ -88,7 +88,7 @@ get_packages_for_pm() {
     echo "curl git gnupg"
     ;;
   yum)
-    echo "curl git gnupg2get"
+    echo "curl git gnupg2"
     ;;
   dnf)
     echo "curl git gnupg2 python3-libdnf5"
@@ -137,7 +137,7 @@ install_packages() {
     sudo apt-get upgrade -y
     # shellcheck disable=SC2086
     sudo apt-get install -y $packages
-    sudo apt-get autoremove -y
+    sudo apt autoremove -y
     ;;
   dnf)
     sudo dnf update -y
