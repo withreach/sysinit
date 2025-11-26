@@ -1,0 +1,94 @@
+---
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: "reload systemd"
+
+- name: Restart SSH service
+  ansible.builtin.service:
+    name: "{{ ssh_service_name | default('sshd') }}"
+    state: restarted
+  become: true
+  listen: "restart ssh"
+
+- name: Reload SSH config
+  ansible.builtin.meta: noop
+  listen: "reload ssh config"
+
+# General service handlers
+- name: Restart Docker service
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  become: true
+  listen: "restart docker"
+
+- name: Reload user profile
+  ansible.builtin.command:
+    cmd: bash -c "source {{ sysinit_user_home }}/.bashrc"
+  become: false
+  changed_when: false
+  listen: "reload profile"
+
+# Reach handlers
+- name: Restore selinux contexts
+  ansible.builtin.command:
+    cmd: "restorecon -R {{ item.path }}"
+  loop: "{{ reach_selinux_contexts }}"
+  become: true
+  when: reach_selinux_enabled | bool
+  changed_when: false
+  listen: "restore selinux contexts"
+
+- name: Reload reach repositories
+  ansible.builtin.command:
+    cmd: "{{ reach_repo_script }} dev"
+    chdir: "{{ reach_base_dir }}"
+  become: false
+  changed_when: true
+  environment:
+    SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
+    SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
+  listen: "reload repositories"
+
+- name: Update reach git repositories
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "{{ item.dest }}"
+    version: "{{ item.version | default('HEAD') }}"
+    update: true
+    force: true
+  loop:
+    - repo: "{{ reach_devops_repo_url }}"
+      dest: "{{ reach_base_dir }}"
+      version: "{{ reach_devops_repo_branch }}"
+  become: false
+  environment:
+    SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
+    SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
+  listen: "update git repositories"
+
+- name: Validate hosts file
+  ansible.builtin.command:
+    cmd: "getent hosts {{ item }}"
+  loop: "{{ reach_dev_hosts }}"
+  changed_when: false
+  failed_when: false
+  listen: "validate hosts"
+
+- name: Backup reach configuration
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}.backup.{{ ansible_date_time.epoch }}"
+    mode: "0644"
+    remote_src: true
+    backup: false
+  loop:
+    - src: "{{ reach_env_file }}"
+      dest: "{{ reach_env_file }}"
+    - src: "{{ reach_config_local }}"
+      dest: "{{ reach_config_local }}"
+  when:
+    - item.src is file
+  listen: "backup reach config"

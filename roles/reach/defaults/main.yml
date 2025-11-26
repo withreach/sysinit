@@ -1,0 +1,67 @@
+---
+# Reach directory structure
+reach_base_dir: "{{ lookup('env', 'HOME') }}/withreach"
+reach_dev_dir: "{{ reach_base_dir }}/dev"
+reach_repos_dir: "{{ reach_dev_dir }}/repos"
+reach_vreach_repo_timeout: 300 # seconds
+reach_devops_repo_url: "git@github.com:withreach/reach-devops.git"
+reach_devops_repo_branch: "master"
+reach_repo_script: "{{ reach_base_dir }}/bin/getRepos.sh"
+reach_repo_timeout: 300 # seconds
+reach_repo_retries: 3
+
+# Reach configuration files
+reach_env_example: "{{ reach_dev_dir }}/env.example"
+reach_env_file: "{{ reach_dev_dir }}/.env"
+reach_config_local_sample: "{{ reach_v2_dir }}/config_local.sample.yaml"
+reach_config_local: "{{ reach_v2_dir }}/config_local.yaml"
+
+# Reach VSCode configuration
+reach_vscode_settings_example: "{{ reach_v2_dir }}/.vscode/settings-example.json"
+reach_vscode_settings: "{{ reach_v2_dir }}/.vscode/settings.json"
+reach_vscode_user_dir: "{{ ansible_env.HOME }}/.config/Code/User"
+
+# Reach host configuration
+reach_hosts_marker: "# Local Development - Reach"
+reach_hosts_backup: true
+reach_dev_hosts:
+  - admin.rch.local
+  - admin-api.rch.local
+  - checkout.rch.local
+  - portal.rch.local
+  - reports.rch.local
+  - stash.rch.local
+  - redirect.rch.local
+  - vue.admin.rch.local
+
+# Reach SSH configuration
+reach_ssh_key_types:
+  - rsa
+  - ed25519
+reach_ssh_config_backup: true
+
+# Reach Git configuration
+reach_git_user_email: ""
+reach_git_user_name: ""
+reach_git_default_branch: "main"
+
+# Reach sudoers configuration
+reach_sudoers_file: "/etc/sudoers.d/{{ ansible_user_id }}-reach"
+reach_sudoers_backup: true
+
+# Reach SELinux configuration
+reach_selinux_enabled: "{{ ansible_selinux.status == 'enabled' if ansible_selinux is defined else false }}"
+reach_selinux_contexts:
+  - path: "{{ reach_base_dir }}"
+    setype: "container_file_t"
+    recurse: true
+
+# AWS configuration
+reach_aws_sso_role_suffix: "dev"
+
+# Tool installation paths
+reach_local_bin: "{{ lookup('env', 'HOME') }}/.local/bin"
+reach_applications_dir: "/usr/share/applications"
+
+# AUR user for Arch Linux (used for AUR package installations)
+reach_aur_user: "{{ lookup('env', 'USER') }}"
