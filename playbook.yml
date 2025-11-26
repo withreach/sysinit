@@ -6,6 +6,8 @@
   vars:
     upgrade: false
     sysinit_var: system_initialization
+    install_reach: false
   roles:
     - sysinit
-    - reach
+    - role: reach
+      when: install_reach | bool

@@ -77,6 +77,24 @@ The installer bootstraps tooling and a virtual environment for you; if you prefe
   ansible-playbook playbook.yml -K -e "git_user_name=Your Name" -e "git_user_email=you@example.com"
   ```
 
+## Configuration Options
+
+### Conditional Role Installation
+
+The playbook supports conditional execution of certain roles:
+
+**Install with reach role:**
+```bash
+ansible-playbook playbook.yml -e "install_reach=true"
+```
+
+Or with the installer script:
+```bash
+./install.sh --extra-vars "install_reach=true"
+```
+
+By default, `install_reach` is set to `false`. Set it to `true` to include the reach role during installation.
+
 ## Development
 
 This project uses [Task](https://taskfile.dev) for automation. After cloning:
