@@ -39,3 +39,50 @@
     - reach-host
     - hosts
     - network
+
+- name: Check if Windows hosts file exists (WSL environment)
+  ansible.builtin.stat:
+    path: /mnt/c/Windows/System32/drivers/etc/hosts
+  register: windows_hosts_file
+  when: 
+    - sysinit_var | default('') != 'molecule_converge'
+    - sysinit_reach_dev_hosts is defined
+    - sysinit_reach_dev_hosts | length > 0
+  tags:
+    - reach
+    - reach-host
+    - hosts
+    - network
+    - windows
+
+- name: Add local development hosts to Windows hosts file
+  ansible.builtin.shell: |
+    # Create a temporary file with the host entries
+    temp_file=$(mktemp)
+    echo "{{ sysinit_reach_hosts_marker }}" > "$temp_file"
+    {% for host in sysinit_reach_dev_hosts %}
+    echo "127.0.0.1 {{ host }}" >> "$temp_file"
+    {% endfor %}
+    echo "{{ sysinit_reach_hosts_marker }}" >> "$temp_file"
+    
+    # Use gsudo to modify the Windows hosts file
+    # First, remove any existing entries between our markers (inclusive)
+    gsudo sed -i '/{{ sysinit_reach_hosts_marker }}/,/{{ sysinit_reach_hosts_marker }}/d' /mnt/c/Windows/System32/drivers/etc/hosts
+    
+    # Then append our new entries
+    gsudo sh -c "cat '$temp_file' >> /mnt/c/Windows/System32/drivers/etc/hosts"
+    
+    # Clean up temp file
+    rm "$temp_file"
+  when: 
+    - sysinit_var | default('') != 'molecule_converge'
+    - windows_hosts_file.stat.exists | default(false)
+    - sysinit_reach_dev_hosts is defined
+    - sysinit_reach_dev_hosts | length > 0
+  changed_when: true
+  tags:
+    - reach
+    - reach-host
+    - hosts
+    - network
+    - windows

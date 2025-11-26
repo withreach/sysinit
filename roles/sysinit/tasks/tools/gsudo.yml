@@ -1,0 +1,101 @@
+---
+# GSudo - Install via winget (Windows package manager) when running in WSL
+- name: GSudo - Detect WSL environment
+  ansible.builtin.stat:
+    path: /mnt/c/Windows/System32
+  register: wsl_windows_system
+  tags:
+    - gsudo
+    - setup
+    - windows
+    - wsl
+
+- name: GSudo - Install via winget (WSL environment)
+  when: wsl_windows_system.stat.exists | default(false)
+  tags:
+    - gsudo
+    - install
+    - windows
+    - wsl
+  block:
+    - name: GSudo - Check if gsudo is already installed
+      ansible.builtin.shell: |
+        /mnt/c/Windows/System32/cmd.exe /c "where gsudo" 2>/dev/null || echo "not found"
+      register: gsudo_check
+      changed_when: false
+      failed_when: false
+      tags:
+        - gsudo
+        - check
+        - windows
+
+    - name: GSudo - Check if winget is available
+      ansible.builtin.shell: |
+        /mnt/c/Windows/System32/cmd.exe /c "where winget" 2>/dev/null || echo "not found"
+      register: winget_check
+      changed_when: false
+      failed_when: false
+      when: gsudo_check.stdout == "not found" or "gsudo" not in gsudo_check.stdout
+      tags:
+        - gsudo
+        - setup
+        - windows
+        - winget
+
+    - name: GSudo - Install via winget
+      ansible.builtin.shell: |
+        /mnt/c/Windows/System32/cmd.exe /c "winget install --id gerardog.gsudo --silent --accept-package-agreements --accept-source-agreements"
+      when: 
+        - gsudo_check.stdout == "not found" or "gsudo" not in gsudo_check.stdout
+        - winget_check is succeeded
+        - winget_check.stdout != "not found" and "winget" in winget_check.stdout
+      register: gsudo_install
+      changed_when: gsudo_install.rc == 0
+      failed_when: gsudo_install.rc != 0 and "already installed" not in gsudo_install.stdout
+      tags:
+        - gsudo
+        - install
+        - windows
+        - winget
+
+    - name: GSudo - Verify installation
+      ansible.builtin.shell: |
+        /mnt/c/Windows/System32/cmd.exe /c "where gsudo"
+      register: gsudo_verify
+      changed_when: false
+      when: gsudo_install is defined and gsudo_install is changed
+      tags:
+        - gsudo
+        - verify
+        - windows
+
+    - name: GSudo - Already installed
+      ansible.builtin.debug:
+        msg:
+          - "GSudo is already installed"
+          - "Location: {{ gsudo_check.stdout_lines | join(', ') }}"
+      when: gsudo_check.stdout != "not found" and "gsudo" in gsudo_check.stdout
+      tags:
+        - gsudo
+        - info
+        - windows
+
+    - name: GSudo - Installation result
+      ansible.builtin.debug:
+        msg:
+          - "GSudo installation completed"
+          - "Location: {{ gsudo_verify.stdout if gsudo_verify is defined else 'Installation completed' }}"
+      when: gsudo_install is defined and gsudo_install is changed
+      tags:
+        - gsudo
+        - info
+        - windows
+
+- name: GSudo - Skip installation (not in WSL)
+  ansible.builtin.debug:
+    msg: "GSudo installation skipped - not running in WSL environment"
+  when: not (wsl_windows_system.stat.exists | default(false))
+  tags:
+    - gsudo
+    - info
+    - skip

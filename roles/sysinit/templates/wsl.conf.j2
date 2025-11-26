@@ -1,0 +1,31 @@
+[boot]
+systemd={{ sysinit_wsl_systemd | default('true') }}
+{% if sysinit_wsl_command is defined %}
+command={{ sysinit_wsl_command }}
+{% endif %}
+
+[user]
+default={{ sysinit_wsl_default_user | default(ansible_user | default(lookup('env', 'USER'))) }}
+
+[automount]
+enabled={{ sysinit_wsl_automount_enabled | default('true') }}
+root={{ sysinit_wsl_automount_root | default('/mnt') }}
+options={{ sysinit_wsl_automount_options | default('"metadata,rw,umask=22,fmask=11"') }}
+mountFsTab={{ sysinit_wsl_automount_fstab | default('true') }}
+{% if sysinit_wsl_automount_ldconfig is defined %}
+ldconfig={{ sysinit_wsl_automount_ldconfig }}
+{% endif %}
+
+[interop]
+enabled={{ sysinit_wsl_interop_enabled | default('true') }}
+appendWindowsPath={{ sysinit_wsl_interop_append_path | default('true') }}
+{% if sysinit_wsl_interop_guiapplications is defined %}
+guiApplications={{ sysinit_wsl_interop_guiapplications }}
+{% endif %}
+
+{% if sysinit_wsl_network is defined %}
+[network]
+{% for key, value in sysinit_wsl_network.items() %}
+{{ key }}={{ value }}
+{% endfor %}
+{% endif %}

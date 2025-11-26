@@ -1,0 +1,198 @@
+---
+- name: Create SSL certificate directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "/etc/ssl/reach"
+    - "/etc/ssl/reach/ca"
+    - "/etc/ssl/reach/certs"
+    - "/etc/ssl/reach/private"
+  become: true
+
+- name: Generate CA private key
+  community.crypto.openssl_privatekey:
+    path: /etc/ssl/reach/ca/ca.key
+    size: 4096
+    type: RSA
+    mode: '0600'
+  become: true
+
+- name: Generate CA certificate signing request
+  community.crypto.openssl_csr:
+    path: /etc/ssl/reach/ca/ca.csr
+    privatekey_path: /etc/ssl/reach/ca/ca.key
+    common_name: "Reach Local CA"
+    organization_name: "Reach Development"
+    organizational_unit_name: "IT Department"
+    country_name: "US"
+    basic_constraints:
+      - "CA:TRUE"
+    basic_constraints_critical: true
+    key_usage:
+      - keyCertSign
+      - cRLSign
+    key_usage_critical: true
+  become: true
+
+- name: Generate self-signed CA certificate
+  community.crypto.x509_certificate:
+    path: /etc/ssl/reach/ca/ca.crt
+    privatekey_path: /etc/ssl/reach/ca/ca.key
+    csr_path: /etc/ssl/reach/ca/ca.csr
+    provider: selfsigned
+    selfsigned_not_after: "+3650d"  # 10 years
+    mode: '0644'
+  become: true
+
+- name: Generate private key for reach domains
+  community.crypto.openssl_privatekey:
+    path: /etc/ssl/reach/private/reach.key
+    size: 2048
+    type: RSA
+    mode: '0600'
+  become: true
+
+- name: Build subject alternative names list
+  ansible.builtin.set_fact:
+    reach_san_list: >-
+      {{
+        ['DNS:*.rch.local', 'DNS:rch.local', 'DNS:localhost', 'IP:127.0.0.1', 'IP:::1'] +
+        (sysinit_reach_dev_hosts | map('regex_replace', '^(.*)$', 'DNS:\1') | list)
+      }}
+
+- name: Generate certificate signing request for reach domains
+  community.crypto.openssl_csr:
+    path: /etc/ssl/reach/certs/reach.csr
+    privatekey_path: /etc/ssl/reach/private/reach.key
+    common_name: "*.rch.local"
+    organization_name: "Reach Development"
+    organizational_unit_name: "IT Department"
+    country_name: "US"
+    subject_alt_name: "{{ reach_san_list }}"
+    key_usage:
+      - keyEncipherment
+      - dataEncipherment
+      - digitalSignature
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+  become: true
+
+- name: Generate signed certificate for reach domains
+  community.crypto.x509_certificate:
+    path: /etc/ssl/reach/certs/reach.crt
+    privatekey_path: /etc/ssl/reach/private/reach.key
+    csr_path: /etc/ssl/reach/certs/reach.csr
+    ownca_path: /etc/ssl/reach/ca/ca.crt
+    ownca_privatekey_path: /etc/ssl/reach/ca/ca.key
+    provider: ownca
+    ownca_not_after: "+365d"  # 1 year
+    mode: '0644'
+  become: true
+
+- name: Install CA certificate in system trust store (Debian/Ubuntu)
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/ca/ca.crt
+    dest: /usr/local/share/ca-certificates/reach-ca.crt
+    mode: '0644'
+    remote_src: true
+  become: true
+  notify: Update ca certificates
+  when: ansible_os_family == "Debian"
+
+- name: Install CA certificate in system trust store (RedHat/Fedora)
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/ca/ca.crt
+    dest: /etc/pki/ca-trust/source/anchors/reach-ca.crt
+    mode: '0644'
+    remote_src: true
+  become: true
+  notify: Update ca trust
+  when: ansible_os_family == "RedHat"
+
+- name: Install CA certificate in system trust store (Arch)
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/ca/ca.crt
+    dest: /etc/ca-certificates/trust-source/anchors/reach-ca.crt
+    mode: '0644'
+    remote_src: true
+  become: true
+  notify: Update ca trust
+  when: ansible_os_family == "Archlinux"
+
+- name: Create reach certificate bundle
+  ansible.builtin.shell: |
+    cat /etc/ssl/reach/certs/reach.crt /etc/ssl/reach/ca/ca.crt > /etc/ssl/reach/certs/reach-bundle.crt
+  become: true
+  args:
+    creates: /etc/ssl/reach/certs/reach-bundle.crt
+
+- name: Set proper permissions on certificate bundle
+  ansible.builtin.file:
+    path: /etc/ssl/reach/certs/reach-bundle.crt
+    mode: '0644'
+  become: true
+
+- name: Create httpd ssl directory
+  ansible.builtin.file:
+    path: "{{ sysinit_reach_dev_dir }}/httpd/ssl"
+    state: directory
+    mode: '0755'
+  become: false
+
+- name: Copy SSL certificate for Apache httpd
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/certs/reach.crt
+    dest: "{{ sysinit_reach_dev_dir }}/httpd/ssl.crt"
+    mode: '0644'
+    remote_src: true
+  become: false
+
+- name: Copy SSL private key for Apache httpd
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/private/reach.key
+    dest: "{{ sysinit_reach_dev_dir }}/httpd/ssl.key"
+    mode: '0600'
+    remote_src: true
+  become: true
+
+- name: Copy CA certificate for Apache httpd
+  ansible.builtin.copy:
+    src: /etc/ssl/reach/ca/ca.crt
+    dest: "{{ sysinit_reach_dev_dir }}/httpd/ca.crt"
+    mode: '0644'
+    remote_src: true
+  become: false
+
+- name: Display certificate information
+  ansible.builtin.debug:
+    msg: |
+      SSL certificates have been generated for reach domains:
+      
+      System certificates:
+      - CA Certificate: /etc/ssl/reach/ca/ca.crt
+      - Server Certificate: /etc/ssl/reach/certs/reach.crt
+      - Server Private Key: /etc/ssl/reach/private/reach.key
+      - Certificate Bundle: /etc/ssl/reach/certs/reach-bundle.crt
+      
+      Apache httpd certificates:
+      - SSL Certificate: {{ sysinit_reach_dev_dir }}/httpd/ssl.crt
+      - SSL Private Key: {{ sysinit_reach_dev_dir }}/httpd/ssl.key
+      - CA Certificate: {{ sysinit_reach_dev_dir }}/httpd/ca.crt
+      
+      Domains covered:
+      - *.rch.local (wildcard)
+      - rch.local
+      {% for host in sysinit_reach_dev_hosts %}
+      - {{ host }}
+      {% endfor %}
+      - localhost
+      - 127.0.0.1 (IPv4)
+      - ::1 (IPv6)
+      
+      Setup instructions:
+      1. Import /etc/ssl/reach/ca/ca.crt as a trusted CA certificate in browsers
+      2. Apache httpd containers will automatically use the certificates in /ssl/
+      3. The certificates are valid for 1 year and the CA for 10 years

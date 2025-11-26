@@ -1,7 +1,4 @@
 ---
-# ============================================================
-#  Docker Install — Debian / Ubuntu
-# ============================================================
 - name: Docker - Install on Debian/Ubuntu
   when: ansible_facts['distribution'] == 'Debian' or ansible_facts['distribution'] == 'Ubuntu'
   block:
@@ -56,9 +53,6 @@
           - docker-compose-plugin
           - bash-completion
 
-# ============================================================
-#  Docker Install — Fedora
-# ============================================================
 - name: Docker - Install on Fedora
   when: ansible_facts['distribution'] == 'Fedora'
   block:
@@ -87,9 +81,6 @@
           - bash-completion
         state: present
 
-# ============================================================
-#  Common Linux: Group + User + Completion
-# ============================================================
 - name: Docker - Add docker group
   ansible.builtin.group:
     name: docker
