@@ -87,12 +87,12 @@ The reach scenario uses specific test variables:
 
 ```yaml
 # Test-specific overrides
-sysinit_reach_base_dir: "/tmp/test-withreach"
-sysinit_reach_devops_repo_url: "https://github.com/withreach/reach-devops.git"
-sysinit_reach_dev_hosts:
+reach_base_dir: "/tmp/test-withreach"
+reach_devops_repo_url: "https://github.com/withreach/reach-devops.git"
+reach_dev_hosts:
   - test.rch.local
   - api.test.rch.local
-sysinit_var: molecule_converge  # Skip git operations in containers
+reach_var: molecule_converge  # Skip git operations in containers
 ```
 
 ## Expected Outcomes

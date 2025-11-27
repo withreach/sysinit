@@ -5,12 +5,12 @@
       # Allow user to modify /etc/hosts without password for reach development
       {{ lookup('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/tee -a /etc/hosts
       {{ lookup('env', 'USER') }} ALL=(ALL) NOPASSWD: /usr/bin/sed -i * /etc/hosts
-    dest: "{{ sysinit_reach_sudoers_file }}"
+    dest: "{{ reach_sudoers_file }}"
     owner: root
     group: root
-    mode: '0440'
-    validate: 'visudo -cf %s'
-    backup: "{{ sysinit_reach_sudoers_backup }}"
+    mode: "0440"
+    validate: "visudo -cf %s"
+    backup: "{{ reach_sudoers_backup }}"
   become: true
   tags:
     - reach

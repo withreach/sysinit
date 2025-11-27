@@ -3,7 +3,8 @@
 reach_base_dir: "{{ lookup('env', 'HOME') }}/withreach"
 reach_dev_dir: "{{ reach_base_dir }}/dev"
 reach_repos_dir: "{{ reach_dev_dir }}/repos"
-reach_vreach_repo_timeout: 300 # seconds
+reach_v2_dir: "{{ reach_repos_dir }}/v2"
+
 reach_devops_repo_url: "git@github.com:withreach/reach-devops.git"
 reach_devops_repo_branch: "master"
 reach_repo_script: "{{ reach_base_dir }}/bin/getRepos.sh"

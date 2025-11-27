@@ -1,6 +1,7 @@
 """Test repository cloning behavior with different sysinit_var values."""
 
 import os
+
 import pytest
 import testinfra.utils.ansible_runner
 
@@ -37,7 +38,7 @@ def test_repo_clone_continues_on_failure_with_molecule_converge(host):
     
     # Verify that the playbook completed successfully despite skipping repo cloning
     # Check that subsequent tasks still executed (e.g., directory creation)
-    reach_base = ansible_vars.get('sysinit_reach_base_dir', '/tmp/test-withreach')
+    reach_base = ansible_vars.get('reach_base_dir', '/tmp/test-withreach')
     base_dir = host.file(reach_base)
     
     # The playbook should have created the base directory even without cloning
@@ -179,7 +180,7 @@ def test_molecule_converge_skips_git_operations(host):
     
     # Verify that the playbook completed successfully
     # This implicitly confirms that git tasks were skipped
-    reach_base = ansible_vars.get('sysinit_reach_base_dir', '/tmp/test-withreach')
+    reach_base = ansible_vars.get('reach_base_dir', '/tmp/test-withreach')
     
     # Check that non-git tasks still executed
     base_dir = host.file(reach_base)

@@ -1,198 +1,74 @@
 ---
-- name: Create SSL certificate directories
+- name: Check if mkcert is installed
+  become: false
+  ansible.builtin.command: which mkcert
+  register: mkcert_check
+  failed_when: false
+  changed_when: false
+
+- name: Fail if mkcert is not installed
+  ansible.builtin.fail:
+    msg: "mkcert is not installed or not in PATH. Please install mkcert before running this role."
+  when: mkcert_check.rc != 0
+
+- name: Create SSL certificate directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ reach_dev_dir }}/httpd"
     state: directory
-    mode: '0755'
-  loop:
-    - "/etc/ssl/reach"
-    - "/etc/ssl/reach/ca"
-    - "/etc/ssl/reach/certs"
-    - "/etc/ssl/reach/private"
-  become: true
+    mode: "0755"
 
-- name: Generate CA private key
-  community.crypto.openssl_privatekey:
-    path: /etc/ssl/reach/ca/ca.key
-    size: 4096
-    type: RSA
-    mode: '0600'
-  become: true
+- name: Check if mkcert CA is already installed
+  ansible.builtin.stat:
+    path: "{{ lookup('env', 'HOME') }}/.local/share/mkcert/rootCA.pem"
+  register: mkcert_ca_stat
 
-- name: Generate CA certificate signing request
-  community.crypto.openssl_csr:
-    path: /etc/ssl/reach/ca/ca.csr
-    privatekey_path: /etc/ssl/reach/ca/ca.key
-    common_name: "Reach Local CA"
-    organization_name: "Reach Development"
-    organizational_unit_name: "IT Department"
-    country_name: "US"
-    basic_constraints:
-      - "CA:TRUE"
-    basic_constraints_critical: true
-    key_usage:
-      - keyCertSign
-      - cRLSign
-    key_usage_critical: true
-  become: true
+- name: Install mkcert CA and add to browser trust store
+  ansible.builtin.command: mkcert -install
+  when: not mkcert_ca_stat.stat.exists
+  register: mkcert_install
+  changed_when: mkcert_install.rc == 0
 
-- name: Generate self-signed CA certificate
-  community.crypto.x509_certificate:
-    path: /etc/ssl/reach/ca/ca.crt
-    privatekey_path: /etc/ssl/reach/ca/ca.key
-    csr_path: /etc/ssl/reach/ca/ca.csr
-    provider: selfsigned
-    selfsigned_not_after: "+3650d"  # 10 years
-    mode: '0644'
-  become: true
+- name: Check if certificates already exist
+  ansible.builtin.stat:
+    path: "{{ reach_dev_dir }}/httpd/ssl.crt"
+  register: ssl_cert_stat
 
-- name: Generate private key for reach domains
-  community.crypto.openssl_privatekey:
-    path: /etc/ssl/reach/private/reach.key
-    size: 2048
-    type: RSA
-    mode: '0600'
-  become: true
+- name: Generate SSL certificates for rch.local domains
+  become: false
+  ansible.builtin.command:
+    cmd: mkcert -cert-file {{ reach_dev_dir }}/httpd/ssl.crt -key-file {{ reach_dev_dir }}/httpd/ssl.key rch.local *.rch.local
+    creates: "{{ reach_dev_dir }}/httpd/ssl.crt"
+  when: not ssl_cert_stat.stat.exists
+  register: mkcert_generate
+  changed_when: mkcert_generate.rc == 0
 
-- name: Build subject alternative names list
-  ansible.builtin.set_fact:
-    reach_san_list: >-
-      {{
-        ['DNS:*.rch.local', 'DNS:rch.local', 'DNS:localhost', 'IP:127.0.0.1', 'IP:::1'] +
-        (sysinit_reach_dev_hosts | map('regex_replace', '^(.*)$', 'DNS:\1') | list)
-      }}
-
-- name: Generate certificate signing request for reach domains
-  community.crypto.openssl_csr:
-    path: /etc/ssl/reach/certs/reach.csr
-    privatekey_path: /etc/ssl/reach/private/reach.key
-    common_name: "*.rch.local"
-    organization_name: "Reach Development"
-    organizational_unit_name: "IT Department"
-    country_name: "US"
-    subject_alt_name: "{{ reach_san_list }}"
-    key_usage:
-      - keyEncipherment
-      - dataEncipherment
-      - digitalSignature
-    extended_key_usage:
-      - serverAuth
-      - clientAuth
-  become: true
-
-- name: Generate signed certificate for reach domains
-  community.crypto.x509_certificate:
-    path: /etc/ssl/reach/certs/reach.crt
-    privatekey_path: /etc/ssl/reach/private/reach.key
-    csr_path: /etc/ssl/reach/certs/reach.csr
-    ownca_path: /etc/ssl/reach/ca/ca.crt
-    ownca_privatekey_path: /etc/ssl/reach/ca/ca.key
-    provider: ownca
-    ownca_not_after: "+365d"  # 1 year
-    mode: '0644'
-  become: true
-
-- name: Install CA certificate in system trust store (Debian/Ubuntu)
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/ca/ca.crt
-    dest: /usr/local/share/ca-certificates/reach-ca.crt
-    mode: '0644'
-    remote_src: true
-  become: true
-  notify: Update ca certificates
-  when: ansible_os_family == "Debian"
-
-- name: Install CA certificate in system trust store (RedHat/Fedora)
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/ca/ca.crt
-    dest: /etc/pki/ca-trust/source/anchors/reach-ca.crt
-    mode: '0644'
-    remote_src: true
-  become: true
-  notify: Update ca trust
-  when: ansible_os_family == "RedHat"
-
-- name: Install CA certificate in system trust store (Arch)
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/ca/ca.crt
-    dest: /etc/ca-certificates/trust-source/anchors/reach-ca.crt
-    mode: '0644'
-    remote_src: true
-  become: true
-  notify: Update ca trust
-  when: ansible_os_family == "Archlinux"
-
-- name: Create reach certificate bundle
-  ansible.builtin.shell: |
-    cat /etc/ssl/reach/certs/reach.crt /etc/ssl/reach/ca/ca.crt > /etc/ssl/reach/certs/reach-bundle.crt
-  become: true
-  args:
-    creates: /etc/ssl/reach/certs/reach-bundle.crt
-
-- name: Set proper permissions on certificate bundle
+- name: Set proper permissions on SSL certificate
   ansible.builtin.file:
-    path: /etc/ssl/reach/certs/reach-bundle.crt
-    mode: '0644'
-  become: true
+    path: "{{ reach_dev_dir }}/httpd/ssl.crt"
+    mode: "0644"
 
-- name: Create httpd ssl directory
+- name: Set proper permissions on SSL private key
   ansible.builtin.file:
-    path: "{{ sysinit_reach_dev_dir }}/httpd/ssl"
-    state: directory
-    mode: '0755'
-  become: false
-
-- name: Copy SSL certificate for Apache httpd
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/certs/reach.crt
-    dest: "{{ sysinit_reach_dev_dir }}/httpd/ssl.crt"
-    mode: '0644'
-    remote_src: true
-  become: false
-
-- name: Copy SSL private key for Apache httpd
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/private/reach.key
-    dest: "{{ sysinit_reach_dev_dir }}/httpd/ssl.key"
-    mode: '0600'
-    remote_src: true
-  become: true
-
-- name: Copy CA certificate for Apache httpd
-  ansible.builtin.copy:
-    src: /etc/ssl/reach/ca/ca.crt
-    dest: "{{ sysinit_reach_dev_dir }}/httpd/ca.crt"
-    mode: '0644'
-    remote_src: true
-  become: false
+    path: "{{ reach_dev_dir }}/httpd/ssl.key"
+    mode: "0600"
 
 - name: Display certificate information
   ansible.builtin.debug:
     msg: |
-      SSL certificates have been generated for reach domains:
-      
-      System certificates:
-      - CA Certificate: /etc/ssl/reach/ca/ca.crt
-      - Server Certificate: /etc/ssl/reach/certs/reach.crt
-      - Server Private Key: /etc/ssl/reach/private/reach.key
-      - Certificate Bundle: /etc/ssl/reach/certs/reach-bundle.crt
-      
-      Apache httpd certificates:
-      - SSL Certificate: {{ sysinit_reach_dev_dir }}/httpd/ssl.crt
-      - SSL Private Key: {{ sysinit_reach_dev_dir }}/httpd/ssl.key
-      - CA Certificate: {{ sysinit_reach_dev_dir }}/httpd/ca.crt
-      
+      mkcert SSL certificates have been configured for reach domains:
+
+      Certificate files:
+      - SSL Certificate: {{ reach_dev_dir }}/httpd/ssl.crt
+      - SSL Private Key: {{ reach_dev_dir }}/httpd/ssl.key
+      - CA Root: {{ lookup('env', 'HOME') }}/.local/share/mkcert/rootCA.pem
+
       Domains covered:
-      - *.rch.local (wildcard)
       - rch.local
-      {% for host in sysinit_reach_dev_hosts %}
-      - {{ host }}
-      {% endfor %}
-      - localhost
-      - 127.0.0.1 (IPv4)
-      - ::1 (IPv6)
-      
-      Setup instructions:
-      1. Import /etc/ssl/reach/ca/ca.crt as a trusted CA certificate in browsers
-      2. Apache httpd containers will automatically use the certificates in /ssl/
-      3. The certificates are valid for 1 year and the CA for 10 years
+      - *.rch.local (wildcard)
+
+      The mkcert CA has been automatically installed in your system's browser trust store.
+      Certificates are trusted by:
+      - Chrome/Chromium
+      - Firefox
+      - Edge
+      - Other browsers using system certificate store

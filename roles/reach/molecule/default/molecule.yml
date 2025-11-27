@@ -67,25 +67,25 @@ provisioner:
       reach-fedora:
         ansible_user: root
         # Test SELinux functionality on Fedora
-        sysinit_reach_selinux_enabled: true
+        reach_selinux_enabled: true
       reach-ubuntu:
         ansible_user: root
         # SELinux not typically enabled on Ubuntu
-        sysinit_reach_selinux_enabled: false
+        reach_selinux_enabled: false
     group_vars:
       reach_test:
         # Override variables for testing
-        sysinit_reach_base_dir: "/tmp/test-withreach"
-        sysinit_reach_devops_repo_url: "https://github.com/withreach/reach-devops.git"
-        sysinit_reach_devops_repo_branch: "master"
-        sysinit_reach_dev_hosts:
+        reach_base_dir: "/tmp/test-withreach"
+        reach_devops_repo_url: "https://github.com/withreach/reach-devops.git"
+        reach_devops_repo_branch: "master"
+        reach_dev_hosts:
           - test.rch.local
           - api.test.rch.local
         # Skip git operations in containers
         sysinit_var: molecule_converge
         # Use test-specific configurations
-        sysinit_reach_git_user_name: "Test User"
-        sysinit_reach_git_user_email: "test@example.com"
+        reach_git_user_name: "Test User"
+        reach_git_user_email: "test@example.com"
   config_options:
     defaults:
       callbacks_enabled: profile_tasks

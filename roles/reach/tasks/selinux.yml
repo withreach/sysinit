@@ -15,24 +15,24 @@
     target: "{{ context_item.path }}"
     setype: "{{ context_item.setype }}"
     state: present
-  loop: "{{ sysinit_reach_selinux_contexts }}"
+  loop: "{{ reach_selinux_contexts }}"
   loop_control:
     loop_var: context_item
   become: true
   when:
-    - sysinit_reach_selinux_enabled | bool
+    - reach_selinux_enabled | bool
     - sysinit_var | default('') != 'molecule_converge'
   notify: restore selinux contexts
 
 - name: Apply SELinux contexts immediately
   ansible.builtin.command:
     cmd: "restorecon -R {{ context_item.path }}"
-  loop: "{{ sysinit_reach_selinux_contexts }}"
+  loop: "{{ reach_selinux_contexts }}"
   loop_control:
     loop_var: context_item
   become: true
   when:
-    - sysinit_reach_selinux_enabled | bool
+    - reach_selinux_enabled | bool
     - sysinit_var | default('') != 'molecule_converge'
   changed_when: false
 
@@ -50,6 +50,6 @@
     loop_var: boolean_item
   become: true
   when:
-    - sysinit_reach_selinux_enabled | bool
+    - reach_selinux_enabled | bool
     - sysinit_var | default('') != 'molecule_converge'
-  failed_when: false  # Some booleans might not exist on all systems
+  failed_when: false # Some booleans might not exist on all systems

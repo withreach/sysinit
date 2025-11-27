@@ -16,3 +16,6 @@
 
 - name: Install repositories
   ansible.builtin.include_tasks: "repos.yml"
+
+- name: Configure SSL certificates
+  ansible.builtin.include_tasks: "ssl-certs.yml"
