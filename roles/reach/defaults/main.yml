@@ -35,6 +35,10 @@ reach_dev_hosts:
   - redirect.rch.local
   - vue.admin.rch.local
 
+# Reach SSL configuration
+reach_dev_ssl_cert_file: "{{ reach_dev_dir }}/httpd/ssl.crt"
+reach_dev_ssl_key_file: "{{ reach_dev_dir }}/httpd/ssl.key"
+
 # Reach SSH configuration
 reach_ssh_key_types:
   - rsa

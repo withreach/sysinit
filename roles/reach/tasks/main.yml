@@ -18,4 +18,4 @@
   ansible.builtin.include_tasks: "repos.yml"
 
 - name: Configure SSL certificates
-  ansible.builtin.include_tasks: "ssl-certs.yml"
+  ansible.builtin.include_tasks: "ssl.yml"

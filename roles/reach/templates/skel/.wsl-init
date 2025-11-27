@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# --- WSL Network Fix ---
+# Network Fix
 sudo ln -fs /run/resolvconf/resolv.conf /etc/resolv.conf
 sudo service resolvconf start >/dev/null 2>&1
 
-# --- Ensure Docker daemon is running ---
+# Ensure Docker daemon is running
 if ! pgrep -x dockerd >/dev/null; then
     sudo dockerd -l fatal >/dev/null 2>&1 &
 fi
