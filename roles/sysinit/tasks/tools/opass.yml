@@ -1,6 +1,6 @@
 ---
 - name: 1Password - Install/Upgrade (APT)
-  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+  when: ansible_facts['distribution'] == 'Debian' or ansible_facts['distribution'] == 'Ubuntu'
   block:
     - name: 1Password - Get system architecture
       ansible.builtin.command: dpkg --print-architecture
@@ -79,7 +79,7 @@
         state: present
 
 - name: 1Password - Install/Upgrade (DNF)
-  when: ansible_distribution == 'Fedora' or ansible_distribution == 'RedHat'
+  when: ansible_facts['distribution'] == 'Fedora' or ansible_facts['distribution'] == 'RedHat'
   block:
     - name: 1Password - Import 1Password GPG key
       ansible.builtin.rpm_key:
@@ -130,7 +130,7 @@
         state: present
 
 - name: 1Password - Install/Upgrade Arch Linux
-  when: ansible_distribution == 'Archlinux'
+  when: ansible_facts['distribution'] == 'Archlinux'
   block:
     - name: 1Password - Ensure base-devel and git are installed
       community.general.pacman:

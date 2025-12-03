@@ -1,6 +1,6 @@
-# Reach Role
+# Sysinit Role
 
-An Ansible role for reach custom configuration
+An Ansible role for system initialization and development environment configuration.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ This role has no external role dependencies but requires the following Ansible c
   hosts: localhost
   become: yes
   roles:
-    - reach
+    - sysinit
 ```
 
 ### Command Line Usage
