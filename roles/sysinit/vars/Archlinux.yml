@@ -2,15 +2,14 @@
 sysinit_distro_packages:
   - postgresql
 
-sysinit_tools:
+sysinit_tools: 
   - aws-ssm
-  - docker
+  - docker 
+  - slack
 
-sysinit_tool_packages:
+sysinit_tool_packages: 
   mkcert:
     - nss
   docker:
     - docker
     - docker-compose
-  aws-ssm:
-    - rpmextract  # Provides rpm2cpio for extracting RPM files
