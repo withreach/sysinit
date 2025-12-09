@@ -1,5 +1,9 @@
 DefaultBrowser = "CHROME"
+{% if ansible_kernel is search('microsoft') or ansible_kernel is search('WSL') %}
 CustomBrowserPath = "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+{% else %}
+CustomBrowserPath = "/usr/bin/chrome"
+{% endif %}
 CustomSSOBrowserPath = ""
 LastCheckForUpdates = 0
 Ordering = ""

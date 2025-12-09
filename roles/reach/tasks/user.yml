@@ -60,16 +60,9 @@
     loop_var: config_file_item
   when:
     - config_file_item.state == "file"
-    - (config_file_item.path | regex_replace(role_path + '/templates/skel/', '')) != '.profile.d/aws'
-
-- name: Install .profile.d/aws as a plain file (no templating)
-  become: false
-  ansible.builtin.copy:
-    src: "{{ role_path }}/templates/skel/.profile.d/aws"
-    dest: "/home/{{ lookup('env', 'USER') }}/.profile.d/aws"
-    owner: "{{ lookup('env', 'USER') }}"
-    group: "{{ lookup('env', 'USER') }}"
-    mode: '0644'
+    - >
+      (config_file_item.path | regex_replace(role_path + '/templates/skel/', '')) != '.profile'
+      or (ansible_kernel is search('microsoft') or ansible_kernel is search('WSL'))
 
 - name: Add profile.d loader to .bashrc
   become: false
@@ -78,29 +71,16 @@
     marker: "# {mark} sysinit: load custom profile settings"
     block: |
       if [ -d "$HOME/.profile.d" ]; then
-        # Files to exclude from sourcing
-        exclude_list=(
-          "$HOME/.profile.d/secret"
-        )
 
         for profile_file in "$HOME"/.profile.d/*; do
           # Skip if not a regular readable file
           [ -f "$profile_file" ] && [ -r "$profile_file" ] || continue
-
-          # Skip hidden files (.something)
-          [[ "$(basename "$profile_file")" == .* ]] && continue
-
-          # Skip if file is in exclude_list
-          if printf '%s\n' "${exclude_list[@]}" | grep -Fxq "$profile_file"; then
-            continue
-          fi
-
           source "$profile_file"
         done
       fi
     owner: "{{ lookup('env', 'USER') }}"
     group: "{{ lookup('env', 'USER') }}"
-    mode: '0644'
+    mode: "0644"
     create: true
 
 - name: Ensure proper ownership of .profile.d directory and contents
