@@ -58,17 +58,17 @@
       become: false
       ansible.builtin.git:
         repo: https://aur.archlinux.org/google-chrome.git
-        dest: "/home/{{ aur_user }}/google-chrome"
+        dest: "/home/{{ sysinit_user }}/google-chrome"
         update: true
         version: master
-      become_user: "{{ aur_user }}"
+      become_user: "{{ sysinit_user }}"
 
     - name: Chrome - Build and install Google Chrome from AUR
       become: false
       ansible.builtin.shell: |
-        cd "/home/{{ aur_user }}/google-chrome" && makepkg -si --noconfirm
+        cd "/home/{{ sysinit_user }}/google-chrome" && makepkg -si --noconfirm
       args:
-        chdir: "/home/{{ aur_user }}/google-chrome"
+        chdir: "/home/{{ sysinit_user }}/google-chrome"
         executable: /bin/bash
-      become_user: "{{ aur_user }}"
+      become_user: "{{ sysinit_user }}"
       changed_when: true

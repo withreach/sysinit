@@ -41,17 +41,17 @@
       become: false
       ansible.builtin.git:
         repo: https://aur.archlinux.org/dbeaver.git
-        dest: "/home/{{ aur_user }}/dbeaver"
+        dest: "/home/{{ sysinit_user }}/dbeaver"
         update: true
         version: master
-      become_user: "{{ aur_user }}"
+      become_user: "{{ sysinit_user }}"
 
     - name: DBeaver - Build and install DBeaver from AUR
       become: false
       ansible.builtin.shell: |
-        cd "/home/{{ aur_user }}/dbeaver" && makepkg -si --noconfirm
+        cd "/home/{{ sysinit_user }}/dbeaver" && makepkg -si --noconfirm
       args:
-        chdir: "/home/{{ aur_user }}/dbeaver"
+        chdir: "/home/{{ sysinit_user }}/dbeaver"
         executable: /bin/bash
-      become_user: "{{ aur_user }}"
+      become_user: "{{ sysinit_user }}"
       changed_when: true

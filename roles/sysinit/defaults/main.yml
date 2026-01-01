@@ -21,7 +21,6 @@ sysinit_mise_plugins:
   - granted
   - jq
   - mkcert
-  - node
   - pre-commit
   - python@3.11
   - starship

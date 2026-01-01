@@ -23,9 +23,9 @@
         key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
       register: devops_clone_result
       become: false
-      environment:
-        SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
-        SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
+      # environment:
+      #   SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
+      #   SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
       when: not devops_repo_gitdir.stat.exists
       ignore_errors: true
 
@@ -68,9 +68,9 @@
       register: repos_output
       changed_when: "'NEW_REPOS_TO_CLONE' in repo_check.stdout"
       become: false
-      environment:
-        SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
-        SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
+      # environment:
+      #   SSH_AUTH_SOCK: "{{ ssh_auth_sock | default(ansible_env.SSH_AUTH_SOCK) }}"
+      #   SSH_AGENT_PID: "{{ ssh_agent_pid | default(ansible_env.SSH_AGENT_PID) }}"
       when: reach_var | default('') != 'molecule_converge'
       ignore_errors: true
 

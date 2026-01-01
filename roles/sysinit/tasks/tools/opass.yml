@@ -172,7 +172,7 @@
       ansible.builtin.git:
         repo: "https://aur.archlinux.org/1password.git"
         dest: "/tmp/1password-aur"
-        version: HEAD
+        version: master
         update: true
       become: false
       when: onepassword_installed.rc != 0
