@@ -1,11 +1,6 @@
 ---
 - name: Ensure DevOps repo exists (clone if missing)
   when: reach_var | default('') != 'molecule_converge'
-  tags:
-    - reach
-    - reach-repos
-    - repositories
-    - git
   block:
     - name: Check if DevOps repo is present
       ansible.builtin.stat:
@@ -56,10 +51,6 @@
       become: false
       changed_when: false
       when: reach_var | default('') != 'molecule_converge'
-
-    - name: Debug
-      ansible.builtin.debug:
-        var: repo_check
 
     - name: Retrieve required repositories
       ansible.builtin.command: "{{ reach_repo_script }} dev"

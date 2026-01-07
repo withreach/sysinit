@@ -20,7 +20,7 @@ reach_config_local: "{{ reach_v2_dir }}/config_local.yaml"
 # Reach VSCode configuration
 reach_vscode_settings_example: "{{ reach_v2_dir }}/.vscode/settings-example.json"
 reach_vscode_settings: "{{ reach_v2_dir }}/.vscode/settings.json"
-reach_vscode_user_dir: "{{ ansible_env.HOME }}/.config/Code/User"
+reach_vscode_user_dir: "{{ ansible_facts['env']['HOME'] }}/.config/Code/User"
 
 # Reach host configuration
 reach_hosts_marker: "# Local Development - Reach"

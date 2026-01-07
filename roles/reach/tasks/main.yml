@@ -12,7 +12,11 @@
   ansible.builtin.include_tasks: "user.yml"
 
 - name: Configure SSH
-  ansible.builtin.include_tasks: "ssh.yml"
+  ansible.builtin.import_tasks: "ssh.yml"
+  tags:
+    - repos
 
 - name: Install repositories
-  ansible.builtin.include_tasks: "repos.yml"
+  ansible.builtin.import_tasks: "repos.yml"
+  tags:
+    - repos
