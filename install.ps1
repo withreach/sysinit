@@ -3,13 +3,13 @@
 
   Features:
     - winget
-    - Optional dev apps (Git, AWS CLI, VSCode, Slack, Postman, Meld...)
+    - Dev apps (Git, AWS CLI/SSM, Mkcert)
+    - Optional dev apps (VSCode, Slack, Postman, Meld...)
     - WSL enabled + WSL2 default
-    - Ddistro selection (default Ubuntu-24.04)
+    - Distro selection (default Ubuntu-24.04)
     - Run Reach sysinit bootstrap inside WSL
     - SSH Sync, Controlled by -SyncSSHKeys (disabled by default)
     - mkcert install + CA trust
-    - rch.local + *.rch.local certificate generation
     - hosts file updates
 #>
 
@@ -54,9 +54,6 @@ Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 # ------------------------------#
 $HostsFile  = "$env:windir\System32\drivers\etc\hosts"
 $HostsMarker = "# Engine aliases v1"
-$CertDir   = Join-Path $env:USERPROFILE "dev\certs"
-$CertFile  = Join-Path $CertDir "rch.local.crt"
-$KeyFile   = Join-Path $CertDir "rch.local.key"
 $WinSSH    = Join-Path $env:USERPROFILE ".ssh"
 $WSLSSH    = "/home/$env:USERNAME/.ssh"
 
@@ -100,14 +97,21 @@ function Install-App {
 }
 
 # ------------------------------#
+# REQUIRED APPS
+# ------------------------------#
+Write-Host "`nInstalling required developer applications..." -ForegroundColor Cyan
+
+Install-App -Name "Git" -CheckCommand "git" -WingetId "Git.Git"
+Install-App -Name "AWS CLI" -CheckCommand "aws" -WingetId "Amazon.AWSCLI"
+Install-App -Name "AWS SSM Session Manager Plugin" -CheckCommand "session-manager-plugin" -WingetId "Amazon.SessionManagerPlugin"
+Install-App -Name "Mkcert" -CheckCommand "mkcert" -WingetId "FiloSottile.mkcert"
+
+# ------------------------------#
 # OPTIONAL EXTRAS
 # ------------------------------#
 if ($InstallExtras) {
     Write-Host "`nInstalling extra developer applications..." -ForegroundColor Cyan
 
-    Install-App -Name "Git" -CheckCommand "git" -WingetId "Git.Git"
-    Install-App -Name "AWS CLI" -CheckCommand "aws" -WingetId "Amazon.AWSCLI"
-    Install-App -Name "AWS SSM Session Manager Plugin" -CheckCommand "session-manager-plugin" -WingetId "Amazon.SessionManagerPlugin"
     Install-App -Name "Postman" -CheckCommand "" -WingetId "Postman.Postman"
     Install-App -Name "Visual Studio Code" -CheckCommand "code" -WingetId "Microsoft.VisualStudioCode"
     Install-App -Name "Slack" -CheckCommand "" -WingetId "SlackTechnologies.Slack"
@@ -201,24 +205,9 @@ else {
 }
 
 # =======================================================================
-# mkcert
+# mkcert CA Install
 # =======================================================================
-function Ensure-Mkcert {
-    if (Get-Command mkcert -ErrorAction SilentlyContinue) {
-        return
-    }
-
-    winget install --silent --accept-source-agreements --accept-package-agreements `
-        --id FiloSottile.mkcert
-}
-
-Ensure-Mkcert
-
 mkcert -install
-
-Write-Host "`nGenerating certs..." -ForegroundColor Cyan
-New-Item -ItemType Directory -Force -Path $CertDir | Out-Null
-mkcert -cert-file $CertFile -key-file $KeyFile "rch.local" "*.rch.local"
 
 # =======================================================================
 # hosts File Update
@@ -244,6 +233,5 @@ Write-Host "`n======== DONE ========" -ForegroundColor Green
 Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
 Write-Host "Extras installed: $InstallExtras"
-Write-Host "Certs: $CertDir"
 Write-Host "Reach sysinit ready."
 
