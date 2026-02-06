@@ -61,7 +61,7 @@ if command -v mise &>/dev/null; then
   }
 
   # awscli
-  if read -ra info <<<"$(mise_info awscli)"; then
+  if read -ra info <<<"$(mise_info aws_completer)"; then
     aws_completer_path="${info[0]%/*}/aws_completer"
     if [[ -f "$aws_completer_path" ]]; then
       complete -C "$aws_completer_path" aws
@@ -70,8 +70,6 @@ if command -v mise &>/dev/null; then
 
   # granted.
   if read -ra info <<<"$(mise_info granted)"; then
-  #   export GRANTED_QUIET=true
-  #   export GRANTED_ALIAS_CONFIGURED=true
     alias assume='source assume'
   fi
 
