@@ -38,7 +38,7 @@ EOF
       if [ -z "$instance_array" ]; then
         echo "No running instances found"
         return
-      elif [ "${#instance_array[@]}" -eq 1 ]; then
+      elif [ "{{ '{#' }}instance_array[@]}" -eq 1 ]; then
         instanceId=$(echo "${instance_array[0]}" | sed 's/\"//g' | cut -d' ' -f2)
       else
         PS3='Select instance to connect to, or 0 to exit: '

@@ -5,7 +5,7 @@
   when: reach_timezone is defined
 
 - name: Configure system locale
-  when: ansible_distribution in ['Debian', 'Ubuntu']
+  when: ansible_facts['distribution'] in ['Debian', 'Ubuntu']
   block:
     - name: Configure system locale
       ansible.builtin.package:

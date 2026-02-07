@@ -62,7 +62,7 @@
     - config_file_item.state == "file"
     - >
       (config_file_item.path | regex_replace(role_path + '/templates/skel/', '')) != '.profile'
-      or (ansible_kernel is search('microsoft') or ansible_kernel is search('WSL'))
+      or (ansible_facts['kernel'] is search('microsoft') or ansible_facts['kernel'] is search('WSL'))
 
 - name: Add profile.d loader to .bashrc
   become: false

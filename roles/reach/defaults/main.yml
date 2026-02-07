@@ -51,11 +51,11 @@ reach_git_user_name: ""
 reach_git_default_branch: "main"
 
 # Reach sudoers configuration
-reach_sudoers_file: "/etc/sudoers.d/{{ ansible_user_id }}-reach"
+reach_sudoers_file: "/etc/sudoers.d/{{ ansible_facts['user_id'] }}-reach"
 reach_sudoers_backup: true
 
 # Reach SELinux configuration
-reach_selinux_enabled: "{{ ansible_selinux.status == 'enabled' if ansible_selinux is defined else false }}"
+reach_selinux_enabled: "{{ ansible_facts['selinux']['status'] == 'enabled' if ansible_facts['selinux'] is defined else false }}"
 reach_selinux_contexts:
   - path: "{{ reach_base_dir }}"
     setype: "container_file_t"

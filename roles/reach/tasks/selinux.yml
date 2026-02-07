@@ -3,7 +3,7 @@
 
 - name: Check if SELinux is enabled
   ansible.builtin.debug:
-    msg: "SELinux status: {{ ansible_selinux.status if ansible_selinux is defined else 'not available' }}"
+    msg: "SELinux status: {{ ansible_facts['selinux']['status'] if ansible_facts['selinux'] is defined else 'not available' }}"
   tags:
     - reach
     - reach-selinux

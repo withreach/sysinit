@@ -32,7 +32,7 @@
 - name: Generate SSH key if none exists
   ansible.builtin.command: >
     ssh-keygen -t ed25519 -f "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519" -N '' \
-    -C "{{ lookup('env', 'USER') }}@{{ ansible_hostname }}"
+    -C "{{ lookup('env', 'USER') }}@{{ ansible_facts['hostname'] }}"
   become: false
   when: not (rsa_key.stat.exists or ed_key.stat.exists)
   register: ssh_key_generated
