@@ -36,3 +36,6 @@
   ansible.builtin.include_tasks: "tools/{{ item }}.yml"
   loop: "{{ sysinit_combined_tools | default([]) }}"
   when: sysinit_combined_tools is defined and sysinit_combined_tools | length > 0
+
+- name: Configure user preferences
+  ansible.builtin.include_tasks: "user.yml"

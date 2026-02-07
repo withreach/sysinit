@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
-[ -f $(which aws_completer) ] && complete -C "$(which aws_completer)" aws
+bash_completions_dir=$HOME/.local/share/bash-completions/completions
 
-[ -f /etc/bash_completion ] && source /etc/bash_completion
+[[ -f $(which aws_completer) ]] && complete -C "aws_completer" aws
 
-[ -f "$HOME/.local/share/bash-completion/completions/docker" ] && source "$HOME/.local/share/bash-completion/completions/docker"
+[[ -f $(which starship) ]] && eval "$(starship init bash)"
 
-[ -f "$HOME/.local/share/bash-completion/completions/git-completion.bash" ] && source "$HOME/.local/share/bash-completion/completions/git-completion.bash"
+[[ -f /etc/bash_completion ]] && source /etc/bash_completion
+
+[[ -f $bash_completions_dir/docker ]] && source $bash_completions_dir/docker
+
+[[ -f $bash_completions_dir/git-completion.bash ]] && source $bash_completions_dir/git-completion.bash
