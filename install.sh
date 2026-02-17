@@ -285,6 +285,7 @@ setup_ssh_agent() {
   local existing_agent=false
   local keys_loaded=false
   local is_interactive=false
+  local keys_found=''
 
   # Check if we have an interactive terminal
   if [ -t 0 ] && [ -t 1 ]; then
