@@ -39,3 +39,19 @@
 
 - name: Configure user preferences
   ansible.builtin.include_tasks: "user.yml"
+
+- name: Ensure .profile.d directory exists
+  ansible.builtin.file:
+    path: "{{ sysinit_user_home }}/.profile.d"
+    state: directory
+    mode: "0755"
+    owner: "{{ sysinit_user }}"
+    group: "{{ sysinit_user }}"
+
+- name: Deploy sysinit profile script
+  ansible.builtin.template:
+    src: profile.d/ysinit
+    dest: "{{ sysinit_user_home }}/.profile.d/sysinit"
+    mode: "0755"
+    owner: "{{ sysinit_user }}"
+    group: "{{ sysinit_user }}"
