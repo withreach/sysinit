@@ -5,6 +5,7 @@ sysinit_force_update: false
 sysinit_packages:
   - gcc
   - make
+  - postgresql-client
   - rsync
   - unzip
   - xclip
@@ -18,7 +19,7 @@ sysinit_mise_plugins:
   - amazon-ecr-credential-helper
   - awscli
   - github-cli
-  - granted
+  - granted@0.38
   - jq
   - mkcert
   - pre-commit
