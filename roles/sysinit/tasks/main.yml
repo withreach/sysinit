@@ -50,7 +50,7 @@
 
 - name: Deploy sysinit profile script
   ansible.builtin.template:
-    src: profile.d/ysinit
+    src: profile.d/sysinit
     dest: "{{ sysinit_user_home }}/.profile.d/sysinit"
     mode: "0755"
     owner: "{{ sysinit_user }}"
