@@ -52,10 +52,19 @@ Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 # ------------------------------#
 # Variables
 # ------------------------------#
-$HostsFile  = "$env:windir\System32\drivers\etc\hosts"
-$HostsMarker = "# Engine aliases v1"
-$WinSSH    = Join-Path $env:USERPROFILE ".ssh"
-$WSLSSH    = "/home/$env:USERNAME/.ssh"
+$HostsFile      = "$env:windir\System32\drivers\etc\hosts"
+$HostsMarker    = "# Engine aliases v1"
+$WinSSH         = Join-Path $env:USERPROFILE ".ssh"
+$WSLSSH         = "/home/$env:USERNAME/.ssh"
+$RebootRequired = $false
+
+# ------------------------------#
+# PATH Refresh
+# ------------------------------#
+function Refresh-EnvPath {
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
 
 # ------------------------------#
 # winget
@@ -121,6 +130,9 @@ else {
     Write-Host "`nSkipping extra developer applications (--InstallExtras:$false)" -ForegroundColor Yellow
 }
 
+# Refresh PATH so winget-installed binaries are available in this session
+Refresh-EnvPath
+
 # ------------------------------#
 # WSL SETUP
 # ------------------------------#
@@ -137,6 +149,7 @@ function Ensure-WSL {
     dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
 
     wsl.exe --set-default-version 2
+    $script:RebootRequired = $true
 }
 
 Ensure-WSL
@@ -152,6 +165,12 @@ function Install-distro {
     }
 
     wsl.exe --install -d $WSLDistro --name $EffectiveDistroName
+
+    $Verify = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
+    if (-not $Verify) {
+        Write-Host "WSL distro installed but requires a reboot to become available." -ForegroundColor Yellow
+        $script:RebootRequired = $true
+    }
 }
 
 Install-distro
@@ -159,17 +178,23 @@ Install-distro
 # ------------------------------#
 # Run sysinit inside WSL
 # ------------------------------#
-Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
+if ($RebootRequired) {
+    Write-Host "`nSkipping WSL sysinit — reboot required first." -ForegroundColor Yellow
+} else {
+    Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
 
-# Detect package manager and install wget based on distro
-wsl.exe -d $EffectiveDistroName -- bash -c "if command -v apt-get > /dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y wget; elif command -v dnf > /dev/null 2>&1; then sudo dnf install -y wget; elif command -v yum > /dev/null 2>&1; then sudo yum install -y wget; elif command -v pacman > /dev/null 2>&1; then sudo pacman -Sy --noconfirm wget; elif command -v zypper > /dev/null 2>&1; then sudo zypper install -y wget; elif command -v apk > /dev/null 2>&1; then sudo apk add --no-cache wget; else echo 'Unable to detect package manager. Please install wget manually.'; exit 1; fi && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
+    # Detect package manager and install wget based on distro
+    wsl.exe -d $EffectiveDistroName -- bash -c "if command -v apt-get > /dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y wget; elif command -v dnf > /dev/null 2>&1; then sudo dnf install -y wget; elif command -v yum > /dev/null 2>&1; then sudo yum install -y wget; elif command -v pacman > /dev/null 2>&1; then sudo pacman -Sy --noconfirm wget; elif command -v zypper > /dev/null 2>&1; then sudo zypper install -y wget; elif command -v apk > /dev/null 2>&1; then sudo apk add --no-cache wget; else echo 'Unable to detect package manager. Please install wget manually.'; exit 1; fi && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
 
-Write-Host "sysinit complete." -ForegroundColor Green
+    Write-Host "sysinit complete." -ForegroundColor Green
+}
 
 # =======================================================================
 # SSH SYNC (controlled by -SyncSSHKeys flag)
 # =======================================================================
-if ($SyncSSHKeys) {
+if ($RebootRequired) {
+    Write-Host "`nSkipping SSH key sync — reboot required first." -ForegroundColor Yellow
+} elseif ($SyncSSHKeys) {
 
     Write-Host "`n===== Syncing SSH Keys from Windows -> WSL =====" -ForegroundColor Cyan
 
@@ -234,4 +259,11 @@ Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
 Write-Host "Extras installed: $InstallExtras"
 Write-Host "Reach sysinit ready."
+
+if ($RebootRequired) {
+    Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
+    Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
+    Write-Host "After rebooting, re-run this script to complete WSL and SSH setup:" -ForegroundColor Yellow
+    Write-Host "  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -DistroName $EffectiveDistroName" -ForegroundColor White
+}
 
