@@ -1,135 +1,296 @@
-# Linux System Initialization
+# System Initialization
 
-An opinionated script to initialize your Linux system.
+Opinionated bootstrap scripts for initializing Linux and Windows developer workstations.
 
-## Distros
+## Supported Platforms
 
-This release has been tested on the following distributions, and should work on all distros based from:
+### Linux
 
-- Arch
-- CentOS
-- Debian
-- Fedora
-- Ubuntu
+Tested on:
 
-## Prerequisites (Mandatory)
+* Arch
+* CentOS
+* Debian
+* Fedora
+* Ubuntu
+
+The installer should also work on most distributions derived from these families.
+
+### Windows
+
+Tested on:
+
+* Windows 11
+* Windows 10
+
+The installer configures:
+
+* Git
+* AWS CLI
+* AWS Session Manager Plugin
+* mkcert
+* WSL2
+* A Linux distribution running Reach sysinit inside WSL
+
+---
+
+# Linux Installation
+
+## Prerequisites
 
 Before running the installer, ensure you have:
 
-- **Sudo privileges** on the machine
-- **Git identity configured globally**:
-  ```bash
-  git config --global user.name "Your Name"
-  git config --global user.email "you@example.com"
-  ```
+### Sudo privileges
 
-  or
+The installer performs system-level changes and requires sudo access.
 
-  ```bash
-  export GIT_USER_NAME="Your Name"
-  export GIT_USER_EMAIL="you@example.com"
-  ```
+### Git identity configured
 
-  *Why: The installer passes your Git identity into the Ansible role and will fail if not provided. It will prompt if missing, but will exit if you leave either value blank.*
+Configure Git globally:
 
-- **An SSH key present and loadable by ssh-agent**:
-  - Recommended to use ed25519 keys
-  - Check for an existing key:
-    ```bash
-    ls ~/.ssh/id_ed25519 ~/.ssh/id_rsa
-    ```
-  - If you don't have one, generate a key:
-    ```bash
-    ssh-keygen -t ed25519 -C "your_email@example.com"
-    ```
-  - Add it to your agent (if needed):
-    ```bash
-    eval "$(ssh-agent -s)"
-    ssh-add ~/.ssh/id_ed25519
-    ```
-  *Why: The installer needs SSH access to clone private repositories. If no usable key is found, it exits with instructions to generate one.*
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
 
-## Usage
+or provide values using environment variables:
 
-**Option 1: One-liner (audited remotely)**
+```bash
+export GIT_USER_NAME="Your Name"
+export GIT_USER_EMAIL="you@example.com"
+```
+
+The installer passes your Git identity into the Ansible roles and will fail if neither method is provided.
+
+### SSH key available
+
+The installer requires SSH access to clone private repositories.
+
+Check for an existing key:
+
+```bash
+ls ~/.ssh/id_ed25519 ~/.ssh/id_rsa
+```
+
+Generate one if necessary:
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+Load the key into your agent:
+
+```bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+```
+
+---
+
+## Installation Methods
+
+### Option 1 — Remote one-line install
+
+Using wget:
+
 ```bash
 wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
 ```
-or
+
+Using curl:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
 ```
 
+### Option 2 — Clone locally and review
 
-**Option 2: Clone locally, review, then run**
 ```bash
 git clone https://github.com/withreach/sysinit.git
 cd sysinit
 ./install.sh
 ```
 
-**Option 3: Run Ansible directly (manual, for advanced users)**
+### Option 3 — Run Ansible directly
 
-The installer bootstraps tooling and a virtual environment for you; if you prefer, you can run the playbook directly:
-- Ensure Python 3.11+ and dependencies are installed (uv/mise steps are handled by install.sh)
-- Install dependencies:
-  ```bash
-  pip install -r requirements.txt
-  ansible-galaxy install -r requirements.yml
-  ```
-- Run the playbook:
-  ```bash
-  ansible-playbook -i inventory/hosts.yml playbook.yml -K
-  ```
+For advanced users who prefer to manage dependencies manually.
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+ansible-galaxy install -r requirements.yml
+```
+
+Run the playbook:
+
+```bash
+ansible-playbook -i inventory/hosts.yml playbook.yml -K
+```
+
+---
 
 ## Configuration Options
 
-### Conditional Role Installation
+### Install Reach components
 
-The playbook supports conditional execution of certain roles:
-
-**Install with reach role:**
 ```bash
 ansible-playbook playbook.yml -e "install_reach=true"
 ```
 
-Or with the installer script:
+or:
+
 ```bash
 ./install.sh --extra-vars "install_reach=true"
 ```
 
-By default, `install_reach` is set to `false`. Set it to `true` to include the reach role during installation.
+By default:
 
-## Development
+```text
+install_reach=false
+```
 
-This project uses [Task](https://taskfile.dev) for automation. After cloning:
+Set it to `true` to include Reach components during installation.
+
+---
+
+# Windows Installation
+
+Open **PowerShell as Administrator** before running any commands.
+
+## Installation Methods
+
+### Option 1 — Default installation
+
+Installs:
+
+* Git
+* AWS CLI
+* AWS Session Manager Plugin
+* mkcert
+* WSL2
+* Ubuntu 24.04
+* Reach sysinit inside WSL
+
+```powershell
+irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1 | iex
+```
+
+### Option 2 — Install with optional developer applications
+
+Also installs:
+
+* Visual Studio Code
+* Slack
+* Postman
+* Meld
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -InstallExtras
+```
+
+### Option 3 — Install with SSH key synchronization
+
+Copies Windows SSH keys into WSL.
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -SyncSSHKeys
+```
+
+### Option 4 — Install using a different WSL distribution
+
+Example using Debian:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -WSLDistro Debian
+```
+
+### Option 5 — Install using a custom distro name
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -DistroName dev-linux
+```
+
+### Option 6 — Full installation example
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -InstallExtras `
+    -SyncSSHKeys `
+    -WSLDistro Ubuntu-24.04 `
+    -DistroName rch-dev
+```
+
+### Option 7 — Clone locally and review
+
+```powershell
+git clone https://github.com/withreach/sysinit.git
+cd sysinit
+.\install.ps1 -InstallExtras -SyncSSHKeys
+```
+
+---
+
+# Development
+
+This project uses Task for automation.
+
+Install development dependencies:
 
 ```bash
-# Install dependencies
 task install-deps
+```
 
-# Install pre-commit hooks
+Install pre-commit hooks:
+
+```bash
 task install-hooks
+```
 
-# See all available tasks
+View available tasks:
+
+```bash
 task --list-all
+```
 
-# Run linting
+Run linting:
+
+```bash
 task lint
+```
 
-# Run tests
+Run tests:
+
+```bash
 task molecule-test
 ```
 
-**Available Development Commands:**
-- `task lint` - Run all linters (pre-commit, ansible-lint, shellcheck)
-- `task syntax-check` - Ansible syntax validation
-- `task molecule-test` - Full Molecule test suite
-- `task molecule-converge` - Quick converge for development
-- `task scan-secrets` - Detect secrets in code
-- `task clean` - Remove build artifacts
+## Available Development Commands
 
-**Notes:**
-- The installer will start an ssh-agent and attempt to load a default SSH key (id_ed25519, id_rsa). If none are found or loadable, it exits with guidance.
-- The playbook targets localhost by default and will ask for sudo (-K) to perform system changes.
+| Command                  | Description                     |
+| ------------------------ | ------------------------------- |
+| `task lint`              | Run all linters                 |
+| `task syntax-check`      | Validate Ansible syntax         |
+| `task molecule-test`     | Run the full Molecule suite     |
+| `task molecule-converge` | Quick converge for development  |
+| `task scan-secrets`      | Scan the repository for secrets |
+| `task clean`             | Remove build artifacts          |
+
+---
+
+## Notes
+
+### Linux
+
+* The installer starts `ssh-agent` automatically if required.
+* It attempts to load `id_ed25519` and `id_rsa`.
+* If no usable key is available, installation stops with instructions.
+
+### Windows
+
+* The installer must be executed from an elevated PowerShell session.
+* SSH key synchronization is disabled by default.
+* The default WSL distribution is `Ubuntu-24.04`.
+* The default WSL instance name is `rch-ubuntu`.
