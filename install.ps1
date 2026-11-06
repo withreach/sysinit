@@ -184,8 +184,9 @@ if ($RebootRequired) {
         'pub=$(ssh-keygen -y -f ~/.ssh/.sysinit-key); ' +
         'case $pub in ssh-ed25519*) n=id_ed25519;; ssh-rsa*) n=id_rsa;; *) echo ''unsupported key type (need ed25519 or rsa)'' >&2; exit 1;; esac; ' +
         'mv ~/.ssh/.sysinit-key ~/.ssh/$n; echo $pub > ~/.ssh/$n.pub; chmod 644 ~/.ssh/$n.pub; echo Installed ~/.ssh/$n'
-    # -e runs bash directly; with `--` the default shell would expand $pub, $n and $(...) first
-    wsl.exe -d $EffectiveDistroName -e bash -c $KeyScript.Replace('__SRC__', $Src)
+    # Ship the script base64-encoded: the command line then has no $, quotes or ; for the WSL shell to expand
+    $B64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($KeyScript.Replace('__SRC__', $Src)))
+    wsl.exe -d $EffectiveDistroName -- bash -c "echo $B64 | base64 -d > /tmp/.sysinit-key.sh && bash /tmp/.sysinit-key.sh && rm -f /tmp/.sysinit-key.sh"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: SSH key install failed (see above)." -ForegroundColor Red
     } else {
