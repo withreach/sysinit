@@ -17,16 +17,6 @@ tasks:
     cmds:
       - find . -name "*.sh" -type f | xargs shellcheck -e SC1091
 
-  secrets:scan:
-    desc: Scan for secrets
-    cmds:
-      - detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins
-
-  secrets:audit:
-    desc: Audit secrets baseline
-    cmds:
-      - detect-secrets audit .secrets.baseline
-
   install:hooks:
     desc: Install pre-commit hooks
     cmds:
