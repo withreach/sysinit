@@ -84,7 +84,11 @@ function Install-App {
     }
 
     Write-Host "Installing $Name..." -ForegroundColor Yellow
-    winget install --silent -e --accept-source-agreements --accept-package-agreements --id $WingetId
+    # --source winget avoids the msstore source (fails with 0x8a15000f on some machines)
+    winget install --silent -e --source winget --accept-source-agreements --accept-package-agreements --id $WingetId
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: failed to install $Name (winget exit $LASTEXITCODE)" -ForegroundColor Red
+    }
 }
 
 # ------------------------------#
@@ -196,37 +200,54 @@ if ($RebootRequired) {
 # =======================================================================
 # mkcert CA Install
 # =======================================================================
-mkcert -install
+Refresh-EnvPath
+if (Get-Command mkcert -ErrorAction SilentlyContinue) {
+    mkcert -install
+} else {
+    Write-Host "WARNING: mkcert not found - skipping CA install. Re-run this script." -ForegroundColor Red
+}
 
 # =======================================================================
-# hosts File Update
+# hosts File Update (single write; retried because AV/other tools can lock it)
 # =======================================================================
-$HostsContent = Get-Content $HostsFile
-if ($HostsContent -notcontains $HostsMarker) {
-    Add-Content $HostsFile "`n$HostsMarker"
-    foreach ($entry in @(
-        "127.0.0.1 admin.rch.local",
-        "127.0.0.1 admin-api.rch.local",
-        "127.0.0.1 checkout.rch.local",
-        "127.0.0.1 portal.rch.local",
-        "127.0.0.1 reports.rch.local",
-        "127.0.0.1 stash.rch.local",
-        "127.0.0.1 redirect.rch.local",
-        "127.0.0.1 vue.admin.rch.local"
-    )) {
-        Add-Content $HostsFile $entry
+if ((Get-Content $HostsFile) -notcontains $HostsMarker) {
+    $HostsBlock = @($HostsMarker) + (@(
+        "admin.rch.local", "admin-api.rch.local", "checkout.rch.local", "portal.rch.local",
+        "reports.rch.local", "stash.rch.local", "redirect.rch.local", "vue.admin.rch.local"
+    ) | ForEach-Object { "127.0.0.1 $_" })
+
+    $HostsUpdated = $false
+    foreach ($Attempt in 1..5) {
+        try {
+            Add-Content -Path $HostsFile -Value (@("") + $HostsBlock) -ErrorAction Stop
+            $HostsUpdated = $true
+            break
+        } catch {
+            Start-Sleep -Seconds 2
+        }
+    }
+    if (-not $HostsUpdated) {
+        Write-Host "WARNING: could not update $HostsFile (locked by another process). Re-run this script." -ForegroundColor Red
     }
 }
 
 Write-Host "`n======== DONE ========" -ForegroundColor Green
 Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
-Write-Host "Reach sysinit ready."
 
 if ($RebootRequired) {
     Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
     Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
-    Write-Host "After rebooting, re-run this script to complete WSL and SSH setup:" -ForegroundColor Yellow
-    Write-Host "  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro" -ForegroundColor White
-}
 
+    # Resume automatically at next logon (UAC prompt, since setup needs admin)
+    $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
+    if ($SyncSSHKeys) { $Rerun += " -SyncSSHKeys" }
+    $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Rerun))
+    $RunOnce = "powershell -NoProfile -WindowStyle Hidden -Command `"Start-Process powershell -Verb RunAs -ArgumentList '-NoExit -ExecutionPolicy Bypass -EncodedCommand $Encoded'`""
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "ReachSysinit" -Value $RunOnce
+    Write-Host "Setup will resume automatically (admin prompt) after you reboot and log in." -ForegroundColor Yellow
+    Write-Host "To run it manually instead:" -ForegroundColor Yellow
+    Write-Host "  $Rerun" -ForegroundColor White
+} else {
+    Write-Host "Reach sysinit ready."
+}
