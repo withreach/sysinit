@@ -40,7 +40,6 @@ Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 $HostsFile      = "$env:windir\System32\drivers\etc\hosts"
 $HostsMarker    = "# Engine aliases v1"
 $WinSSH         = Join-Path $env:USERPROFILE ".ssh"
-$WSLSSH         = "/home/$env:USERNAME/.ssh"
 $RebootRequired = $false
 
 # wsl.exe emits UTF-16; strip NULs so name matching works
@@ -171,10 +170,10 @@ if ($RebootRequired) {
     if (!(Test-Path $WinSSH)) {
         Write-Host "No SSH keys found - creating new ed25519 keys..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Force -Path $WinSSH | Out-Null
-        ssh-keygen -t ed25519 -f "$WinSSH\id_ed25519" -N ""
+        ssh-keygen -t ed25519 -f "$WinSSH\id_ed25519" -N '""'  # PowerShell 5.1 drops a bare empty-string argument
     }
 
-    wsl.exe -d $EffectiveDistroName -- bash -c "mkdir -p $WSLSSH; chmod 700 $WSLSSH"
+    wsl.exe -d $EffectiveDistroName -- bash -c "mkdir -p ~/.ssh; chmod 700 ~/.ssh"
 
     $KeyFiles = @(
         "id_rsa", "id_rsa.pub",
@@ -182,18 +181,24 @@ if ($RebootRequired) {
         "known_hosts", "config"
     )
 
+    $Copied = 0
     foreach ($Key in $KeyFiles) {
         $WinKeyPath = Join-Path $WinSSH $Key
         if (Test-Path $WinKeyPath) {
+            $Copied++
             Write-Host "Copying $Key -> WSL..." -ForegroundColor Cyan
-            Get-Content $WinKeyPath -Raw | wsl.exe -d $EffectiveDistroName -- bash -c "cat > $WSLSSH/$Key"
-            wsl.exe -d $EffectiveDistroName -- bash -c "chmod 600 $WSLSSH/$Key"
+            $Src = (wsl.exe -d $EffectiveDistroName -- wslpath -u ($WinKeyPath -replace '\\', '/')).Trim()
+            wsl.exe -d $EffectiveDistroName -- bash -c "cp '$Src' ~/.ssh/$Key"
         }
     }
 
-    wsl.exe -d $EffectiveDistroName -- bash -c "chmod 700 $WSLSSH; chmod 600 $WSLSSH/*"
+    wsl.exe -d $EffectiveDistroName -- bash -c "chmod 700 ~/.ssh; chmod 600 ~/.ssh/*"
 
-    Write-Host "SSH key sync complete." -ForegroundColor Green
+    if ($Copied -eq 0) {
+        Write-Host "WARNING: none of $($KeyFiles -join ', ') found in $WinSSH - nothing was synced (rename e.g. id_rsa.pem to id_rsa)." -ForegroundColor Red
+    } else {
+        Write-Host "SSH key sync complete." -ForegroundColor Green
+    }
 }
 else {
     Write-Host "`nSkipping SSH key sync (SyncSSHKeys disabled)" -ForegroundColor Yellow
