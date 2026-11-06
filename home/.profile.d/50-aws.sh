@@ -99,5 +99,3 @@ aws-get_all_running_instances() {
   
   readarray -t instance_array < <(aws ec2 describe-instances --query "$query" --output json | jq -r 'sort_by(.[]) | .[] | join(" ")')
 }
-
-alias c='aws-ssm_connect'
