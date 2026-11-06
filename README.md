@@ -56,12 +56,13 @@ Also runs `install.sh --dev` in WSL, installs mkcert and trusts its CA on Window
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -Dev
 ```
 
-### Option 3 — Install with SSH key synchronization
+### Option 3 — Install your SSH key into WSL
 
-Copies Windows SSH keys into WSL.
+Pass the path to your private key (ed25519 or RSA, any filename). It is installed in WSL as `~/.ssh/id_ed25519` or `~/.ssh/id_rsa` with a matching `.pub`, whatever your Windows and Linux usernames are. If the key has a passphrase you are prompted for it once. Without `-SSHKey`, nothing is copied.
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -SyncSSHKeys
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -SSHKey C:\Users\you\.ssh\id_rsa.pem
 ```
 
 ### Option 4 — Install using a different WSL distribution (Debian/Ubuntu only)
@@ -78,7 +79,7 @@ Example using Debian:
 ```powershell
 git clone https://github.com/withreach/sysinit.git
 cd sysinit
-.\install.ps1 -SyncSSHKeys
+.\install.ps1 -SSHKey C:\Users\you\.ssh\id_ed25519
 ```
 
 ---
@@ -105,4 +106,4 @@ Run `install.sh` in a throwaway Debian/Ubuntu container or WSL instance, and run
 
 ## Notes
 
-The Windows installer must run from an elevated PowerShell; SSH key sync is off by default; the WSL instance is named `rch-<distro>` (e.g. `rch-ubuntu`).
+The Windows installer must run from an elevated PowerShell; the WSL instance is named `rch-<distro>` (e.g. `rch-ubuntu`).

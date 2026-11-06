@@ -2,14 +2,14 @@
   Reach Windows Developer Bootstrap (Windows 10/11)
 
   Enables WSL2, installs a Debian/Ubuntu distro and runs the Linux install.sh
-  inside it. -SyncSSHKeys copies Windows SSH keys into WSL.
+  inside it. -SSHKey <path> installs that private key (ed25519 or RSA) into WSL.
   -Dev also sets up the Reach dev environment: repos and config in WSL, plus
   mkcert (CA trust) and the rch.local hosts entries on Windows.
 #>
 
 param(
     [string]$WSLDistro = "Ubuntu-24.04",
-    [switch]$SyncSSHKeys = $false,
+    [string]$SSHKey = "",
     [switch]$Dev = $false
 )
 
@@ -25,12 +25,20 @@ If (-NOT ([Security.Principal.WindowsPrincipal] `
     exit 1
 }
 
+if ($SSHKey) {
+    if (-not (Test-Path -LiteralPath $SSHKey -PathType Leaf)) {
+        Write-Host "ERROR: -SSHKey file not found: $SSHKey" -ForegroundColor Red
+        exit 1
+    }
+    $SSHKey = (Resolve-Path -LiteralPath $SSHKey).Path
+}
+
 # Remove the post-reboot resume task if this run was started by it
 Unregister-ScheduledTask -TaskName "ReachSysinitResume" -Confirm:$false -ErrorAction SilentlyContinue
 
 Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
 Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
-Write-Host "Sync SSH Keys: $SyncSSHKeys" -ForegroundColor Cyan
+Write-Host "SSH key: $(if ($SSHKey) { $SSHKey } else { '(none)' })" -ForegroundColor Cyan
 Write-Host "Dev environment: $Dev" -ForegroundColor Cyan
 
 # e.g. "Ubuntu-24.04" -> "rch-ubuntu"
@@ -42,7 +50,6 @@ Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 # ------------------------------#
 $HostsFile      = "$env:windir\System32\drivers\etc\hosts"
 $HostsMarker    = "# Engine aliases v1"
-$WinSSH         = Join-Path $env:USERPROFILE ".ssh"
 $RebootRequired = $false
 
 # wsl.exe emits UTF-16; strip NULs so name matching works
@@ -162,49 +169,30 @@ if ($RebootRequired) {
 }
 
 # =======================================================================
-# SSH SYNC (controlled by -SyncSSHKeys flag)
+# SSH KEY (only with -SSHKey <path>)
 # =======================================================================
 if ($RebootRequired) {
-    Write-Host "`nSkipping SSH key sync — reboot required first." -ForegroundColor Yellow
-} elseif ($SyncSSHKeys) {
+    Write-Host "`nSkipping SSH key install - reboot required first." -ForegroundColor Yellow
+} elseif ($SSHKey) {
+    Write-Host "`n===== Installing SSH key into WSL =====" -ForegroundColor Cyan
 
-    Write-Host "`n===== Syncing SSH Keys from Windows -> WSL =====" -ForegroundColor Cyan
-
-    if (!(Test-Path $WinSSH)) {
-        Write-Host "No SSH keys found - creating new ed25519 keys..." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Force -Path $WinSSH | Out-Null
-        ssh-keygen -t ed25519 -f "$WinSSH\id_ed25519" -N '""'  # PowerShell 5.1 drops a bare empty-string argument
-    }
-
-    wsl.exe -d $EffectiveDistroName -- bash -c "mkdir -p ~/.ssh; chmod 700 ~/.ssh"
-
-    $KeyFiles = @(
-        "id_rsa", "id_rsa.pub",
-        "id_ed25519", "id_ed25519.pub",
-        "known_hosts", "config"
-    )
-
-    $Copied = 0
-    foreach ($Key in $KeyFiles) {
-        $WinKeyPath = Join-Path $WinSSH $Key
-        if (Test-Path $WinKeyPath) {
-            $Copied++
-            Write-Host "Copying $Key -> WSL..." -ForegroundColor Cyan
-            $Src = (wsl.exe -d $EffectiveDistroName -- wslpath -u ($WinKeyPath -replace '\\', '/')).Trim()
-            wsl.exe -d $EffectiveDistroName -- bash -c "cp '$Src' ~/.ssh/$Key"
-        }
-    }
-
-    wsl.exe -d $EffectiveDistroName -- bash -c "chmod 700 ~/.ssh; chmod 600 ~/.ssh/*"
-
-    if ($Copied -eq 0) {
-        Write-Host "WARNING: none of $($KeyFiles -join ', ') found in $WinSSH - nothing was synced (rename e.g. id_rsa.pem to id_rsa)." -ForegroundColor Red
+    # Copy via /mnt/c, detect the key type with ssh-keygen (prompts for a passphrase if the key has one),
+    # install it as ~/.ssh/id_ed25519 or id_rsa and write the matching .pub
+    $Src = (wsl.exe -d $EffectiveDistroName -- wslpath -u ($SSHKey -replace '\\', '/')).Trim()
+    $KeyScript = 'set -e; trap ''rm -f ~/.ssh/.sysinit-key'' EXIT; mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
+        'cp ''__SRC__'' ~/.ssh/.sysinit-key; chmod 600 ~/.ssh/.sysinit-key; ' +
+        'pub=$(ssh-keygen -y -f ~/.ssh/.sysinit-key); ' +
+        'case $pub in ssh-ed25519*) n=id_ed25519;; ssh-rsa*) n=id_rsa;; *) echo ''unsupported key type (need ed25519 or rsa)'' >&2; exit 1;; esac; ' +
+        'mv ~/.ssh/.sysinit-key ~/.ssh/$n; echo $pub > ~/.ssh/$n.pub; chmod 644 ~/.ssh/$n.pub; echo Installed ~/.ssh/$n'
+    wsl.exe -d $EffectiveDistroName -- bash -c $KeyScript.Replace('__SRC__', $Src)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: SSH key install failed (see above)." -ForegroundColor Red
     } else {
-        Write-Host "SSH key sync complete." -ForegroundColor Green
+        Write-Host "SSH key installed." -ForegroundColor Green
     }
 }
 else {
-    Write-Host "`nSkipping SSH key sync (SyncSSHKeys disabled)" -ForegroundColor Yellow
+    Write-Host "`nSkipping SSH key install (no -SSHKey given)" -ForegroundColor Yellow
 }
 
 # ------------------------------#
@@ -259,7 +247,7 @@ if ($Dev) {
 
 Write-Host "`n======== DONE ========" -ForegroundColor Green
 Write-Host "WSL distro name: $EffectiveDistroName"
-Write-Host "SSH Sync: $SyncSSHKeys"
+Write-Host "SSH key: $(if ($SSHKey) { $SSHKey } else { '(none)' })"
 Write-Host "Dev environment: $Dev"
 
 if ($RebootRequired) {
@@ -268,7 +256,7 @@ if ($RebootRequired) {
 
     # Resume at next logon via an elevated scheduled task (no UAC prompt), then reboot
     $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
-    if ($SyncSSHKeys) { $Rerun += " -SyncSSHKeys" }
+    if ($SSHKey) { $Rerun += " -SSHKey '" + ($SSHKey -replace "'", "''") + "'" }
     if ($Dev) { $Rerun += " -Dev" }
     $ResumeLog = Join-Path $env:ProgramData "ReachSysinit\resume.log"
     New-Item -ItemType Directory -Force -Path (Split-Path $ResumeLog) | Out-Null
