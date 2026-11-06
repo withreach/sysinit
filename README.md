@@ -26,11 +26,13 @@ It installs system packages, the AWS SSM plugin, Docker and mise (with the tools
 
 Open **PowerShell as Administrator** before running any commands.
 
+If a reboot is needed, the script schedules itself to resume after you log in and restarts the machine after 30 seconds (cancel with `shutdown /a`).
+
 ## Installation Methods
 
 ### Option 1 — Default installation
 
-Installs Git, mkcert, WSL2 and Ubuntu 24.04 (instance `rch-ubuntu`), runs `install.sh` inside it, trusts the mkcert CA and adds the Reach hosts entries.
+Installs mkcert, WSL2 and Ubuntu 24.04 (instance `rch-ubuntu`), runs `install.sh` inside it, trusts the mkcert CA and adds the Reach hosts entries.
 
 ```powershell
 irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1 | iex

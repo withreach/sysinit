@@ -1,7 +1,7 @@
 <#
   Reach Windows Developer Bootstrap (Windows 10/11)
 
-  Installs Git and mkcert (winget), enables WSL2, installs a Debian/Ubuntu
+  Installs mkcert, enables WSL2, installs a Debian/Ubuntu
   distro, runs the Linux install.sh inside it, trusts the mkcert CA and
   adds the Reach hosts entries. -SyncSSHKeys copies Windows SSH keys into WSL.
 #>
@@ -22,6 +22,9 @@ If (-NOT ([Security.Principal.WindowsPrincipal] `
     Write-Host "Right-click PowerShell → Run as Administrator"
     exit 1
 }
+
+# Remove the post-reboot resume task if this run was started by it
+Unregister-ScheduledTask -TaskName "ReachSysinitResume" -Confirm:$false -ErrorAction SilentlyContinue
 
 Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
 Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
@@ -49,65 +52,37 @@ function Refresh-EnvPath {
 }
 
 # ------------------------------#
-# winget
+# mkcert (direct from the official GitHub release; winget is unreliable here)
 # ------------------------------#
-function Ensure-Winget {
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host "winget OK."
+function Install-Mkcert {
+    if (Get-Command mkcert -ErrorAction SilentlyContinue) {
+        Write-Host "mkcert already installed."
         return
     }
 
-    Write-Host "Installing winget..." -ForegroundColor Yellow
-    $WingetUrl = "https://aka.ms/getwinget"
-    $Installer = "$env:TEMP\winget.msixbundle"
+    Write-Host "Installing mkcert..." -ForegroundColor Yellow
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $Arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+        $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/FiloSottile/mkcert/releases/latest" -Headers @{ "User-Agent" = "sysinit" }
+        $Asset = $Release.assets | Where-Object { $_.name -like "*-windows-$Arch.exe" } | Select-Object -First 1
+        if (-not $Asset) { throw "no windows-$Arch asset in release $($Release.tag_name)" }
 
-    Invoke-WebRequest -Uri $WingetUrl -OutFile $Installer -UseBasicParsing
-    Add-AppxPackage -Path $Installer
-    Remove-Item $Installer -Force
-}
+        $Dir = Join-Path $env:ProgramFiles "mkcert"
+        New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+        Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile (Join-Path $Dir "mkcert.exe") -UseBasicParsing
 
-Ensure-Winget
-
-# ------------------------------#
-# App Installer Helper
-# ------------------------------#
-function Install-App {
-    param (
-        [string]$Name,
-        [string]$CheckCommand,
-        [string]$WingetId
-    )
-
-    if ($CheckCommand -and (Get-Command $CheckCommand -ErrorAction SilentlyContinue)) {
-        Write-Host "$Name already installed."
-        return
-    }
-
-    Write-Host "Installing $Name..." -ForegroundColor Yellow
-    # --source winget avoids the msstore source (fails with 0x8a15000f on some machines)
-    $WingetArgs = @("install", "--silent", "-e", "--source", "winget", "--accept-source-agreements", "--accept-package-agreements", "--id", $WingetId)
-    winget @WingetArgs
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget failed; resetting sources and retrying once..." -ForegroundColor Yellow
-        winget source reset --force
-        winget source update
-        winget @WingetArgs
-    }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARNING: failed to install $Name (winget exit $LASTEXITCODE)" -ForegroundColor Red
+        $MachinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+        if (($MachinePath -split ";") -notcontains $Dir) {
+            [Environment]::SetEnvironmentVariable("Path", "$MachinePath;$Dir", "Machine")
+        }
+        Refresh-EnvPath
+    } catch {
+        Write-Host "WARNING: failed to install mkcert: $_" -ForegroundColor Red
     }
 }
 
-# ------------------------------#
-# APPS
-# ------------------------------#
-Write-Host "`nInstalling developer applications..." -ForegroundColor Cyan
-
-Install-App -Name "Git" -CheckCommand "git" -WingetId "Git.Git"
-Install-App -Name "Mkcert" -CheckCommand "mkcert" -WingetId "FiloSottile.mkcert"
-
-# Refresh PATH so winget-installed binaries are available in this session
-Refresh-EnvPath
+Install-Mkcert
 
 # ------------------------------#
 # WSL SETUP
@@ -161,11 +136,17 @@ function Install-distro {
     }
 
     wsl.exe --install -d $WSLDistro --name $EffectiveDistroName
+    $InstallExit = $LASTEXITCODE
 
     $Verify = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
     if (-not $Verify) {
-        Write-Host "ERROR: $EffectiveDistroName was not installed (wsl exit $LASTEXITCODE). See the output above." -ForegroundColor Red
-        exit 1
+        if ($InstallExit -ne 0) {
+            Write-Host "ERROR: $EffectiveDistroName was not installed (wsl exit $InstallExit). See the output above." -ForegroundColor Red
+            exit 1
+        }
+        # wsl --install succeeded but the distro only appears after the features it enabled take effect
+        Write-Host "WSL distro installed but requires a reboot to become available." -ForegroundColor Yellow
+        $script:RebootRequired = $true
     }
 }
 
@@ -270,15 +251,19 @@ if ($RebootRequired) {
     Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
     Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
 
-    # Resume automatically at next logon (UAC prompt, since setup needs admin)
+    # Resume at next logon via an elevated scheduled task (no UAC prompt), then reboot
     $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
     if ($SyncSSHKeys) { $Rerun += " -SyncSSHKeys" }
     $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Rerun))
-    $RunOnce = "powershell -NoProfile -WindowStyle Hidden -Command `"Start-Process powershell -Verb RunAs -ArgumentList '-NoExit -ExecutionPolicy Bypass -EncodedCommand $Encoded'`""
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "ReachSysinit" -Value $RunOnce
-    Write-Host "Setup will resume automatically (admin prompt) after you reboot and log in." -ForegroundColor Yellow
+    $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoExit -ExecutionPolicy Bypass -EncodedCommand $Encoded"
+    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+    $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
+    Register-ScheduledTask -TaskName "ReachSysinitResume" -Action $Action -Trigger $Trigger -Principal $Principal -Force | Out-Null
+
+    Write-Host "Setup resumes automatically after you log in. Rebooting in 30 seconds (cancel with: shutdown /a)." -ForegroundColor Yellow
     Write-Host "To run it manually instead:" -ForegroundColor Yellow
     Write-Host "  $Rerun" -ForegroundColor White
+    shutdown.exe /r /t 30 /c "Reach sysinit: reboot to finish WSL setup"
 } else {
     Write-Host "Reach sysinit ready."
 }
