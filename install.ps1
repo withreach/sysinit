@@ -1,22 +1,13 @@
 <#
-  Reach Windows Developer Bootstrap
+  Reach Windows Developer Bootstrap (Windows 10/11)
 
-  Features:
-    - winget
-    - Dev apps (Git, AWS CLI/SSM, Mkcert)
-    - Optional dev apps (VSCode, Slack, Postman, Meld...)
-    - WSL enabled + WSL2 default
-    - Distro selection (default Ubuntu-24.04)
-    - Run Reach sysinit bootstrap inside WSL
-    - SSH Sync, Controlled by -SyncSSHKeys (disabled by default)
-    - mkcert install + CA trust
-    - hosts file updates
+  Installs Git and mkcert (winget), enables WSL2, installs a Debian/Ubuntu
+  distro, runs the Linux install.sh inside it, trusts the mkcert CA and
+  adds the Reach hosts entries. -SyncSSHKeys copies Windows SSH keys into WSL.
 #>
 
 param(
-    [switch]$InstallExtras = $false,
     [string]$WSLDistro = "Ubuntu-24.04",
-    [string]$DistroName = "",
     [switch]$SyncSSHKeys = $false
 )
 
@@ -33,20 +24,11 @@ If (-NOT ([Security.Principal.WindowsPrincipal] `
 }
 
 Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
-Write-Host "Install Extras: $InstallExtras" -ForegroundColor Cyan
 Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
 Write-Host "Sync SSH Keys: $SyncSSHKeys" -ForegroundColor Cyan
 
-# Set the effective distro name 
-# Use custom name if provided, otherwise generate rch-[os] from the distro name
-if ($DistroName) {
-    $EffectiveDistroName = $DistroName
-} else {
-    # Extract OS name from distro (e.g., "Ubuntu-24.04" -> "ubuntu", "Debian" -> "debian")
-    $OsName = ($WSLDistro -split '-')[0].ToLower()
-    $EffectiveDistroName = "rch-$OsName"
-}
-
+# e.g. "Ubuntu-24.04" -> "rch-ubuntu"
+$EffectiveDistroName = "rch-" + ($WSLDistro -split '-')[0].ToLower()
 Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
 
 # ------------------------------#
@@ -106,29 +88,12 @@ function Install-App {
 }
 
 # ------------------------------#
-# REQUIRED APPS
+# APPS
 # ------------------------------#
-Write-Host "`nInstalling required developer applications..." -ForegroundColor Cyan
+Write-Host "`nInstalling developer applications..." -ForegroundColor Cyan
 
 Install-App -Name "Git" -CheckCommand "git" -WingetId "Git.Git"
-Install-App -Name "AWS CLI" -CheckCommand "aws" -WingetId "Amazon.AWSCLI"
-Install-App -Name "AWS SSM Session Manager Plugin" -CheckCommand "session-manager-plugin" -WingetId "Amazon.SessionManagerPlugin"
 Install-App -Name "Mkcert" -CheckCommand "mkcert" -WingetId "FiloSottile.mkcert"
-
-# ------------------------------#
-# OPTIONAL EXTRAS
-# ------------------------------#
-if ($InstallExtras) {
-    Write-Host "`nInstalling extra developer applications..." -ForegroundColor Cyan
-
-    Install-App -Name "Postman" -CheckCommand "" -WingetId "Postman.Postman"
-    Install-App -Name "Visual Studio Code" -CheckCommand "code" -WingetId "Microsoft.VisualStudioCode"
-    Install-App -Name "Slack" -CheckCommand "" -WingetId "SlackTechnologies.Slack"
-    Install-App -Name "Meld" -CheckCommand "meld" -WingetId "Meld.Meld"
-}
-else {
-    Write-Host "`nSkipping extra developer applications (--InstallExtras:$false)" -ForegroundColor Yellow
-}
 
 # Refresh PATH so winget-installed binaries are available in this session
 Refresh-EnvPath
@@ -175,20 +140,6 @@ function Install-distro {
 
 Install-distro
 
-# ------------------------------#
-# Run sysinit inside WSL
-# ------------------------------#
-if ($RebootRequired) {
-    Write-Host "`nSkipping WSL sysinit — reboot required first." -ForegroundColor Yellow
-} else {
-    Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
-
-    # Detect package manager and install wget based on distro
-    wsl.exe -d $EffectiveDistroName -- bash -c "if command -v apt-get > /dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y wget; elif command -v dnf > /dev/null 2>&1; then sudo dnf install -y wget; elif command -v yum > /dev/null 2>&1; then sudo yum install -y wget; elif command -v pacman > /dev/null 2>&1; then sudo pacman -Sy --noconfirm wget; elif command -v zypper > /dev/null 2>&1; then sudo zypper install -y wget; elif command -v apk > /dev/null 2>&1; then sudo apk add --no-cache wget; else echo 'Unable to detect package manager. Please install wget manually.'; exit 1; fi && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
-
-    Write-Host "sysinit complete." -ForegroundColor Green
-}
-
 # =======================================================================
 # SSH SYNC (controlled by -SyncSSHKeys flag)
 # =======================================================================
@@ -217,16 +168,29 @@ if ($RebootRequired) {
         if (Test-Path $WinKeyPath) {
             Write-Host "Copying $Key -> WSL..." -ForegroundColor Cyan
             Get-Content $WinKeyPath -Raw | wsl.exe -d $EffectiveDistroName -- bash -c "cat > $WSLSSH/$Key"
-            wsl.exe -d $EffectiveDistroName -- bash -c 'chmod 600 $WSLSSH/$Key || true'
+            wsl.exe -d $EffectiveDistroName -- bash -c "chmod 600 $WSLSSH/$Key"
         }
     }
 
-    wsl.exe -d $EffectiveDistroName -- bash -c 'chmod 700 $WSLSSH; chmod 600 $WSLSSH/* 2>/dev/null || true'
+    wsl.exe -d $EffectiveDistroName -- bash -c "chmod 700 $WSLSSH; chmod 600 $WSLSSH/*"
 
     Write-Host "SSH key sync complete." -ForegroundColor Green
 }
 else {
     Write-Host "`nSkipping SSH key sync (SyncSSHKeys disabled)" -ForegroundColor Yellow
+}
+
+# ------------------------------#
+# Run sysinit inside WSL
+# ------------------------------#
+if ($RebootRequired) {
+    Write-Host "`nSkipping WSL sysinit - reboot required first." -ForegroundColor Yellow
+} else {
+    Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
+
+    wsl.exe -d $EffectiveDistroName -- bash -c "sudo apt-get update -y && sudo apt-get install -y wget && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
+
+    Write-Host "sysinit complete." -ForegroundColor Green
 }
 
 # =======================================================================
@@ -257,13 +221,12 @@ if ($HostsContent -notcontains $HostsMarker) {
 Write-Host "`n======== DONE ========" -ForegroundColor Green
 Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
-Write-Host "Extras installed: $InstallExtras"
 Write-Host "Reach sysinit ready."
 
 if ($RebootRequired) {
     Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
     Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
     Write-Host "After rebooting, re-run this script to complete WSL and SSH setup:" -ForegroundColor Yellow
-    Write-Host "  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -DistroName $EffectiveDistroName" -ForegroundColor White
+    Write-Host "  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro" -ForegroundColor White
 }
 
