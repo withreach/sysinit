@@ -101,6 +101,7 @@ deploy_dotfiles() {
   fi
 
   git_identity
+  rm -f "$HOME/.profile.d/sysinit" "$HOME/.profile.d/00-shell.sh" # replaced by 20-mise.sh / 30-completions.sh
   cp -rT "$src/home" "$HOME"
   sed -i \
     -e "s|@GIT_USER_NAME@|${GIT_USER_NAME//&/\\&}|" \
