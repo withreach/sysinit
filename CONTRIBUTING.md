@@ -14,7 +14,7 @@ Hooks run on commit: whitespace/YAML checks, secret detection (`detect-secrets`,
 
 - `install.sh` - Debian/Ubuntu bootstrap (packages, Docker, mise, dotfiles, Reach setup)
 - `home/` - dotfiles copied into `$HOME`; `@GIT_USER_NAME@` / `@GIT_USER_EMAIL@` in `.gitconfig` are substituted by `install.sh`
-- `install.ps1`, `bootstrap.cmd` - Windows bootstrap (WSL2, Git, mkcert, hosts)
+- `install.ps1` - Windows bootstrap (WSL2, mkcert, hosts)
 
 ## Testing
 
