@@ -4,10 +4,22 @@ Bootstrap scripts for Reach developer workstations: Windows (installs WSL2) and 
 
 ## Linux (Debian/Ubuntu)
 
-Requires sudo and an SSH key on GitHub (loaded in your agent) for cloning private repos. Optionally set `GIT_USER_NAME` / `GIT_USER_EMAIL`; otherwise your global git config is used.
+Requires sudo. Optionally set `GIT_USER_NAME` / `GIT_USER_EMAIL`; otherwise your global git config is used.
+
+The install has two parts:
+
+* **Base** (default): system packages, AWS SSM plugin, Docker, mise and its tools, dotfiles in `home/`, and an SSH key (generated if you have none).
+* **Reach dev environment** (`--dev`): sudoers and `/etc/hosts` entries for `*.rch.local`, the reach-devops clone, `getRepos.sh`, and the `.env`, `config_local.yaml` and VS Code settings. This needs an SSH key on GitHub, loaded in your agent.
 
 ```bash
 wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash
+```
+
+Add the dev environment now or later (safe to re-run; config files are only created if missing):
+
+```bash
+wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash -s -- --dev
+~/sysinit/install.sh --dev
 ```
 
 or review first:
@@ -15,10 +27,8 @@ or review first:
 ```bash
 git clone https://github.com/withreach/sysinit.git
 cd sysinit
-./install.sh
+./install.sh        # base; add --dev for the Reach dev environment
 ```
-
-It installs system packages, the AWS SSM plugin, Docker and mise (with the tools listed in `install.sh`), deploys the dotfiles in `home/`, configures sudoers and `/etc/hosts` for `*.rch.local`, generates an SSH key if none exists, and clones the reach-devops repos. Re-running is safe; `.env`, `config_local.yaml` and VS Code settings are only created if missing.
 
 ---
 
@@ -32,13 +42,21 @@ If a reboot is needed, the script schedules itself to resume after you log in an
 
 ### Option 1 — Default installation
 
-Installs mkcert, WSL2 and Ubuntu 24.04 (instance `rch-ubuntu`), runs `install.sh` inside it, trusts the mkcert CA and adds the Reach hosts entries.
+Installs WSL2 and Ubuntu 24.04 (instance `rch-ubuntu`) and runs the base `install.sh` inside it.
 
 ```powershell
 irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1 | iex
 ```
 
-### Option 2 — Install with SSH key synchronization
+### Option 2 — Include the Reach dev environment
+
+Also runs `install.sh --dev` in WSL, installs mkcert and trusts its CA on Windows, and adds the `rch.local` hosts entries.
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -Dev
+```
+
+### Option 3 — Install with SSH key synchronization
 
 Copies Windows SSH keys into WSL.
 
@@ -46,7 +64,7 @@ Copies Windows SSH keys into WSL.
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -SyncSSHKeys
 ```
 
-### Option 3 — Install using a different WSL distribution (Debian/Ubuntu only)
+### Option 4 — Install using a different WSL distribution (Debian/Ubuntu only)
 
 Example using Debian:
 
@@ -55,7 +73,7 @@ Example using Debian:
     -WSLDistro Debian
 ```
 
-### Option 4 — Clone locally and review
+### Option 5 — Clone locally and review
 
 ```powershell
 git clone https://github.com/withreach/sysinit.git

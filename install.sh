@@ -1,6 +1,15 @@
 #!/bin/bash
-# Reach developer workstation bootstrap for Debian/Ubuntu (including WSL).
+# Reach workstation bootstrap for Debian/Ubuntu (including WSL).
+#   ./install.sh         base setup: packages, Docker, mise tools, dotfiles, SSH key
+#   ./install.sh --dev   also the Reach dev environment: repos, config files, local hosts
 set -euo pipefail
+
+DEV=false
+case "${1:-}" in
+  "") ;;
+  --dev|-d) DEV=true ;;
+  *) echo "Usage: $0 [--dev]" >&2; exit 1 ;;
+esac
 
 SYSINIT_REPO=https://github.com/withreach/sysinit.git
 REACH_DEVOPS_REPO=git@github.com:withreach/reach-devops.git
@@ -188,7 +197,10 @@ install_ssm_plugin
 install_docker
 install_mise
 deploy_dotfiles
-configure_system
 setup_ssh_key
-setup_reach_repos
+if [[ "$DEV" == true ]]; then
+  configure_system
+  setup_reach_repos
+fi
 log "Done. Open a new shell (docker group membership needs a re-login)."
+[[ "$DEV" == true ]] || log "Reach dev environment not installed; run again with --dev to add it."

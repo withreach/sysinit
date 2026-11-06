@@ -1,14 +1,16 @@
 <#
   Reach Windows Developer Bootstrap (Windows 10/11)
 
-  Installs mkcert, enables WSL2, installs a Debian/Ubuntu
-  distro, runs the Linux install.sh inside it, trusts the mkcert CA and
-  adds the Reach hosts entries. -SyncSSHKeys copies Windows SSH keys into WSL.
+  Enables WSL2, installs a Debian/Ubuntu distro and runs the Linux install.sh
+  inside it. -SyncSSHKeys copies Windows SSH keys into WSL.
+  -Dev also sets up the Reach dev environment: repos and config in WSL, plus
+  mkcert (CA trust) and the rch.local hosts entries on Windows.
 #>
 
 param(
     [string]$WSLDistro = "Ubuntu-24.04",
-    [switch]$SyncSSHKeys = $false
+    [switch]$SyncSSHKeys = $false,
+    [switch]$Dev = $false
 )
 
 # ------------------------------#
@@ -29,6 +31,7 @@ Unregister-ScheduledTask -TaskName "ReachSysinitResume" -Confirm:$false -ErrorAc
 Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
 Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
 Write-Host "Sync SSH Keys: $SyncSSHKeys" -ForegroundColor Cyan
+Write-Host "Dev environment: $Dev" -ForegroundColor Cyan
 
 # e.g. "Ubuntu-24.04" -> "rch-ubuntu"
 $EffectiveDistroName = "rch-" + ($WSLDistro -split '-')[0].ToLower()
@@ -86,7 +89,7 @@ function Install-Mkcert {
     }
 }
 
-Install-Mkcert
+if ($Dev) { Install-Mkcert }
 
 # ------------------------------#
 # WSL SETUP
@@ -211,49 +214,53 @@ if ($RebootRequired) {
     Write-Host "`nSkipping WSL sysinit - reboot required first." -ForegroundColor Yellow
 } else {
     Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
+    $DevArg = if ($Dev) { "--dev" } else { "" }
 
-    wsl.exe -d $EffectiveDistroName -- bash -c "sudo apt-get update -y && sudo apt-get install -y wget && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash"
+    wsl.exe -d $EffectiveDistroName -- bash -c "sudo apt-get update -y && sudo apt-get install -y wget && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash -s -- $DevArg"
 
     Write-Host "sysinit complete." -ForegroundColor Green
 }
 
-# =======================================================================
-# mkcert CA Install
-# =======================================================================
-Refresh-EnvPath
-if (Get-Command mkcert -ErrorAction SilentlyContinue) {
-    mkcert -install
-} else {
-    Write-Host "WARNING: mkcert not found - skipping CA install. Re-run this script." -ForegroundColor Red
-}
-
-# =======================================================================
-# hosts File Update (single write; retried because AV/other tools can lock it)
-# =======================================================================
-if ((Get-Content $HostsFile) -notcontains $HostsMarker) {
-    $HostsBlock = @($HostsMarker) + (@(
-        "admin.rch.local", "admin-api.rch.local", "checkout.rch.local", "portal.rch.local",
-        "reports.rch.local", "stash.rch.local", "redirect.rch.local", "vue.admin.rch.local"
-    ) | ForEach-Object { "127.0.0.1 $_" })
-
-    $HostsUpdated = $false
-    foreach ($Attempt in 1..5) {
-        try {
-            Add-Content -Path $HostsFile -Value (@("") + $HostsBlock) -ErrorAction Stop
-            $HostsUpdated = $true
-            break
-        } catch {
-            Start-Sleep -Seconds 2
-        }
+if ($Dev) {
+    # =======================================================================
+    # mkcert CA Install
+    # =======================================================================
+    Refresh-EnvPath
+    if (Get-Command mkcert -ErrorAction SilentlyContinue) {
+        mkcert -install
+    } else {
+        Write-Host "WARNING: mkcert not found - skipping CA install. Re-run this script." -ForegroundColor Red
     }
-    if (-not $HostsUpdated) {
-        Write-Host "WARNING: could not update $HostsFile (locked by another process). Re-run this script." -ForegroundColor Red
+
+    # =======================================================================
+    # hosts File Update (single write; retried because AV/other tools can lock it)
+    # =======================================================================
+    if ((Get-Content $HostsFile) -notcontains $HostsMarker) {
+        $HostsBlock = @($HostsMarker) + (@(
+            "admin.rch.local", "admin-api.rch.local", "checkout.rch.local", "portal.rch.local",
+            "reports.rch.local", "stash.rch.local", "redirect.rch.local", "vue.admin.rch.local"
+        ) | ForEach-Object { "127.0.0.1 $_" })
+
+        $HostsUpdated = $false
+        foreach ($Attempt in 1..5) {
+            try {
+                Add-Content -Path $HostsFile -Value (@("") + $HostsBlock) -ErrorAction Stop
+                $HostsUpdated = $true
+                break
+            } catch {
+                Start-Sleep -Seconds 2
+            }
+        }
+        if (-not $HostsUpdated) {
+            Write-Host "WARNING: could not update $HostsFile (locked by another process). Re-run this script." -ForegroundColor Red
+        }
     }
 }
 
 Write-Host "`n======== DONE ========" -ForegroundColor Green
 Write-Host "WSL distro name: $EffectiveDistroName"
 Write-Host "SSH Sync: $SyncSSHKeys"
+Write-Host "Dev environment: $Dev"
 
 if ($RebootRequired) {
     Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
@@ -262,6 +269,7 @@ if ($RebootRequired) {
     # Resume at next logon via an elevated scheduled task (no UAC prompt), then reboot
     $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
     if ($SyncSSHKeys) { $Rerun += " -SyncSSHKeys" }
+    if ($Dev) { $Rerun += " -Dev" }
     $ResumeLog = Join-Path $env:ProgramData "ReachSysinit\resume.log"
     New-Item -ItemType Directory -Force -Path (Split-Path $ResumeLog) | Out-Null
     $ResumeCmd = "Start-Transcript -Path '$ResumeLog' -Force | Out-Null; " +
