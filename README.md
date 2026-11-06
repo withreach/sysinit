@@ -26,7 +26,7 @@ It installs system packages, the AWS SSM plugin, Docker and mise (with the tools
 
 Open **PowerShell as Administrator** before running any commands.
 
-If a reboot is needed, the script schedules itself to resume after you log in and restarts the machine after 30 seconds (cancel with `shutdown /a`).
+If a reboot is needed, the script schedules itself to resume after you log in and restarts the machine after 10 seconds (cancel with `shutdown /a`).
 
 ## Installation Methods
 

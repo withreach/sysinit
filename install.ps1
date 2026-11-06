@@ -43,6 +43,11 @@ $WinSSH         = Join-Path $env:USERPROFILE ".ssh"
 $WSLSSH         = "/home/$env:USERNAME/.ssh"
 $RebootRequired = $false
 
+# wsl.exe emits UTF-16; strip NULs so name matching works
+function Get-WslDistros {
+    (wsl.exe --list --quiet 2>$null) -replace "`0", "" | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }
+}
+
 # ------------------------------#
 # PATH Refresh
 # ------------------------------#
@@ -129,8 +134,7 @@ Ensure-WSL
 # INSTALL DISTRO
 # ------------------------------#
 function Install-distro {
-    $Existing = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
-    if ($Existing) {
+    if (Get-WslDistros | Where-Object { $_ -eq $EffectiveDistroName }) {
         Write-Host "$EffectiveDistroName already installed."
         return
     }
@@ -138,8 +142,7 @@ function Install-distro {
     wsl.exe --install -d $WSLDistro --name $EffectiveDistroName
     $InstallExit = $LASTEXITCODE
 
-    $Verify = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
-    if (-not $Verify) {
+    if (-not (Get-WslDistros | Where-Object { $_ -eq $EffectiveDistroName })) {
         if ($InstallExit -ne 0) {
             Write-Host "ERROR: $EffectiveDistroName was not installed (wsl exit $InstallExit). See the output above." -ForegroundColor Red
             exit 1
@@ -254,16 +257,21 @@ if ($RebootRequired) {
     # Resume at next logon via an elevated scheduled task (no UAC prompt), then reboot
     $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
     if ($SyncSSHKeys) { $Rerun += " -SyncSSHKeys" }
-    $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Rerun))
+    $ResumeLog = Join-Path $env:ProgramData "ReachSysinit\resume.log"
+    New-Item -ItemType Directory -Force -Path (Split-Path $ResumeLog) | Out-Null
+    $ResumeCmd = "Start-Transcript -Path '$ResumeLog' -Force | Out-Null; " +
+                 "while (-not (Test-Connection -ComputerName github.com -Count 1 -Quiet)) { Start-Sleep -Seconds 3 }; $Rerun"
+    $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($ResumeCmd))
+    $Me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoExit -ExecutionPolicy Bypass -EncodedCommand $Encoded"
-    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-    $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
+    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $Me
+    $Principal = New-ScheduledTaskPrincipal -UserId $Me -LogonType Interactive -RunLevel Highest
     Register-ScheduledTask -TaskName "ReachSysinitResume" -Action $Action -Trigger $Trigger -Principal $Principal -Force | Out-Null
 
-    Write-Host "Setup resumes automatically after you log in. Rebooting in 30 seconds (cancel with: shutdown /a)." -ForegroundColor Yellow
+    Write-Host "Setup resumes automatically after you log in. Rebooting in 10 seconds (cancel with: shutdown /a)." -ForegroundColor Yellow
     Write-Host "To run it manually instead:" -ForegroundColor Yellow
     Write-Host "  $Rerun" -ForegroundColor White
-    shutdown.exe /r /t 30 /c "Reach sysinit: reboot to finish WSL setup"
+    shutdown.exe /r /t 10 /c "Reach sysinit: reboot to finish WSL setup"
 } else {
     Write-Host "Reach sysinit ready."
 }
