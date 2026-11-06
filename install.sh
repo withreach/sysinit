@@ -15,8 +15,8 @@ DEV_HOSTS=(
   reports.rch.local stash.rch.local redirect.rch.local vue.admin.rch.local
 )
 MISE_TOOLS=(
-  amazon-ecr-credential-helper awscli github-cli granted@0.38 jq mkcert
-  pre-commit python@3.11 starship usage
+  amazon-ecr-credential-helper awscli github-cli granted jq mkcert
+  pre-commit python@3.11 python@3.14 starship usage uv
 )
 
 log() { echo "==> $*"; }
