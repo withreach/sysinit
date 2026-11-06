@@ -184,7 +184,8 @@ if ($RebootRequired) {
         'pub=$(ssh-keygen -y -f ~/.ssh/.sysinit-key); ' +
         'case $pub in ssh-ed25519*) n=id_ed25519;; ssh-rsa*) n=id_rsa;; *) echo ''unsupported key type (need ed25519 or rsa)'' >&2; exit 1;; esac; ' +
         'mv ~/.ssh/.sysinit-key ~/.ssh/$n; echo $pub > ~/.ssh/$n.pub; chmod 644 ~/.ssh/$n.pub; echo Installed ~/.ssh/$n'
-    wsl.exe -d $EffectiveDistroName -- bash -c $KeyScript.Replace('__SRC__', $Src)
+    # -e runs bash directly; with `--` the default shell would expand $pub, $n and $(...) first
+    wsl.exe -d $EffectiveDistroName -e bash -c $KeyScript.Replace('__SRC__', $Src)
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: SSH key install failed (see above)." -ForegroundColor Red
     } else {
