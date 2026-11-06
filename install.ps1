@@ -85,7 +85,14 @@ function Install-App {
 
     Write-Host "Installing $Name..." -ForegroundColor Yellow
     # --source winget avoids the msstore source (fails with 0x8a15000f on some machines)
-    winget install --silent -e --source winget --accept-source-agreements --accept-package-agreements --id $WingetId
+    $WingetArgs = @("install", "--silent", "-e", "--source", "winget", "--accept-source-agreements", "--accept-package-agreements", "--id", $WingetId)
+    winget @WingetArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "winget failed; resetting sources and retrying once..." -ForegroundColor Yellow
+        winget source reset --force
+        winget source update
+        winget @WingetArgs
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: failed to install $Name (winget exit $LASTEXITCODE)" -ForegroundColor Red
     }
@@ -108,17 +115,37 @@ Refresh-EnvPath
 Write-Host "`n===== Setting Up WSL =====" -ForegroundColor Cyan
 
 function Ensure-WSL {
-    wsl.exe --status 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "WSL already installed."
+    foreach ($Feature in "Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform") {
+        $State = (Get-WindowsOptionalFeature -Online -FeatureName $Feature).State
+        if ($State -eq "EnablePending") {
+            $script:RebootRequired = $true
+        } elseif ($State -ne "Enabled") {
+            dism.exe /online /enable-feature /featurename:$Feature /all /norestart
+            if ($LASTEXITCODE -eq 3010) {
+                $script:RebootRequired = $true
+            } elseif ($LASTEXITCODE -ne 0) {
+                Write-Host "ERROR: could not enable $Feature (dism exit $LASTEXITCODE)." -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
+    if ($RebootRequired) { return }
+
+    # Features are on; the hypervisor must also be running (needs firmware virtualization)
+    $Cs = Get-CimInstance Win32_ComputerSystem
+    if (-not $Cs.HypervisorPresent) {
+        $FwEnabled = (Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled
+        if (-not $FwEnabled) {
+            Write-Host "ERROR: virtualization is disabled. Enable Intel VT-x / AMD-V (SVM) in BIOS/UEFI," -ForegroundColor Red
+            Write-Host "or, inside a VM, enable nested virtualization. Then re-run this script." -ForegroundColor Red
+            exit 1
+        }
+        bcdedit.exe /set hypervisorlaunchtype auto | Out-Null
+        $script:RebootRequired = $true
         return
     }
 
-    dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-    dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-
     wsl.exe --set-default-version 2
-    $script:RebootRequired = $true
 }
 
 Ensure-WSL
@@ -137,12 +164,16 @@ function Install-distro {
 
     $Verify = wsl.exe --list --quiet 2>$null | Select-String -Pattern "^$EffectiveDistroName"
     if (-not $Verify) {
-        Write-Host "WSL distro installed but requires a reboot to become available." -ForegroundColor Yellow
-        $script:RebootRequired = $true
+        Write-Host "ERROR: $EffectiveDistroName was not installed (wsl exit $LASTEXITCODE). See the output above." -ForegroundColor Red
+        exit 1
     }
 }
 
-Install-distro
+if ($RebootRequired) {
+    Write-Host "Skipping distro install - reboot required first." -ForegroundColor Yellow
+} else {
+    Install-distro
+}
 
 # =======================================================================
 # SSH SYNC (controlled by -SyncSSHKeys flag)
