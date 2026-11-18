@@ -77,7 +77,16 @@ Example using Debian:
     -WSLDistro Debian
 ```
 
-### Option 5 — Clone locally and review
+### Option 5 — Choose the WSL instance name
+
+The instance is named `rch-<distro>` (`rch-ubuntu`, `rch-debian`) by default; an instance with that name that already exists is reused. Pass `-WSLName` (letters, digits, `.`, `_`, `-`) to create additional, independent installs:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -WSLName rch-feature-x -Dev
+```
+
+### Option 6 — Clone locally and review
 
 ```powershell
 git clone https://github.com/withreach/sysinit.git

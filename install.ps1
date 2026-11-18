@@ -14,6 +14,8 @@
 
 param(
     [string]$WSLDistro = "Ubuntu-24.04",
+    # WSL instance name; defaults to rch-<distro>, e.g. rch-ubuntu
+    [string]$WSLName = "",
     [string]$SSHKey = "",
     [switch]$Dev = $false,
     # Internal: set on the elevated child that performs the machine-wide steps
@@ -152,7 +154,11 @@ if ($SSHKey) {
 }
 
 # e.g. "Ubuntu-24.04" -> "rch-ubuntu"
-$EffectiveDistroName = "rch-" + ($WSLDistro -split '-')[0].ToLower()
+$EffectiveDistroName = if ($WSLName) { $WSLName } else { "rch-" + ($WSLDistro -split '-')[0].ToLower() }
+if ($EffectiveDistroName -notmatch '^[A-Za-z0-9._-]+$') {
+    Write-Host "ERROR: -WSLName may only contain letters, digits, '.', '_' and '-': $EffectiveDistroName" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
 Write-Host "Windows user: $($Me.Name)" -ForegroundColor Cyan
@@ -288,7 +294,7 @@ if ($RebootRequired) {
     Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
 
     # Resume at this user's next logon via HKCU RunOnce (removed by Windows once it runs), then reboot
-    $Rerun = "& ([scriptblock]::Create((irm $ScriptUrl))) -WSLDistro $WSLDistro"
+    $Rerun = "& ([scriptblock]::Create((irm $ScriptUrl))) -WSLDistro $WSLDistro -WSLName $EffectiveDistroName"
     if ($SSHKey) { $Rerun += " -SSHKey '" + ($SSHKey -replace "'", "''") + "'" }
     if ($Dev) { $Rerun += " -Dev" }
     $ResumeDir = Join-Path $env:LOCALAPPDATA "ReachSysinit"
