@@ -52,8 +52,11 @@ irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.
 
 Also runs `install.sh --dev` in WSL, installs mkcert and trusts its CA on Windows, and adds the `rch.local` hosts entries.
 
+The Reach repositories are private and cloned over SSH, so WSL needs a key registered with your GitHub account; the install stops early if GitHub rejects it. Pass `-SSHKey` (see Option 3) to copy your key in, or omit it if the key is already in `~/.ssh` in WSL.
+
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -Dev
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) `
+    -Dev -SSHKey C:\Users\you\.ssh\id_ed25519
 ```
 
 ### Option 3 — Install your SSH key into WSL

@@ -37,8 +37,21 @@ install_packages() {
   log "System packages"
   sudo apt-get update
   sudo apt-get install -y bash-completion ca-certificates curl gcc git gnupg \
-    libnss3-tools locales make postgresql-client rsync unzip xclip xsel zip
+    libnss3-tools locales make openssh-client postgresql-client rsync unzip xclip xsel zip
   sudo locale-gen en_US.UTF-8
+}
+
+# The Reach repositories are private and cloned over SSH; fail before the long install if GitHub rejects us
+check_github_ssh() {
+  log "GitHub SSH access"
+  local out
+  out="$(ssh -T -o StrictHostKeyChecking=accept-new git@github.com 2>&1 || true)"
+  if [[ "$out" != *"successfully authenticated"* ]]; then
+    echo "$out" >&2
+    echo "ERROR: --dev needs an SSH key in ~/.ssh (or ssh-agent) that is registered with your GitHub account." >&2
+    echo "On Windows pass -SSHKey <path> to install.ps1, or put the key in ~/.ssh in WSL, then re-run." >&2
+    exit 1
+  fi
 }
 
 install_ssm_plugin() {
@@ -193,6 +206,7 @@ setup_reach_repos() {
 }
 
 install_packages
+[[ "$DEV" == true ]] && check_github_ssh
 install_ssm_plugin
 install_docker
 install_mise
