@@ -34,7 +34,7 @@ cd sysinit
 
 # Windows Installation
 
-Open **PowerShell as Administrator** before running any commands.
+Open a **regular (non-admin) PowerShell** as your own Windows user. WSL distros are per user, so running "as Administrator" with a separate admin account would install WSL for that account only. The script asks for Administrator rights (UAC) just for the machine-wide steps: Windows features, mkcert and the hosts file. If that step fails, its log is in `C:\ProgramData\ReachSysinit\admin.log`.
 
 If a reboot is needed, the script schedules itself to resume after you log in and restarts the machine after 10 seconds (cancel with `shutdown /a`).
 

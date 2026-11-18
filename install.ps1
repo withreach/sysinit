@@ -5,69 +5,46 @@
   inside it. -SSHKey <path> installs that private key (ed25519 or RSA) into WSL.
   -Dev also sets up the Reach dev environment: repos and config in WSL, plus
   mkcert (CA trust) and the rch.local hosts entries on Windows.
+
+  Run from a regular (non-elevated) PowerShell. WSL distros, the SSH key and the
+  mkcert CA are per Windows user, so they are installed as the user running the
+  script; only the machine-wide steps (Windows features, hypervisor, mkcert
+  binary, hosts file) run in an elevated child process via a UAC prompt.
 #>
 
 param(
     [string]$WSLDistro = "Ubuntu-24.04",
     [string]$SSHKey = "",
-    [switch]$Dev = $false
+    [switch]$Dev = $false,
+    # Internal: set on the elevated child that performs the machine-wide steps
+    [switch]$AdminPhase = $false
 )
 
-# ------------------------------#
-# Admin Check
-# ------------------------------#
-If (-NOT ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
-    [Security.Principal.WindowsBuiltInRole]::Administrator)) {
-
-    Write-Host "ERROR: This script must be run as Administrator." -ForegroundColor Red
-    Write-Host "Right-click PowerShell → Run as Administrator"
-    exit 1
-}
-
-if ($SSHKey) {
-    if (-not (Test-Path -LiteralPath $SSHKey -PathType Leaf)) {
-        Write-Host "ERROR: -SSHKey file not found: $SSHKey" -ForegroundColor Red
-        exit 1
-    }
-    $SSHKey = (Resolve-Path -LiteralPath $SSHKey).Path
-}
-
-# Remove the post-reboot resume task if this run was started by it
-Unregister-ScheduledTask -TaskName "ReachSysinitResume" -Confirm:$false -ErrorAction SilentlyContinue
-
-Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
-Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
-Write-Host "SSH key: $(if ($SSHKey) { $SSHKey } else { '(none)' })" -ForegroundColor Cyan
-Write-Host "Dev environment: $Dev" -ForegroundColor Cyan
-
-# e.g. "Ubuntu-24.04" -> "rch-ubuntu"
-$EffectiveDistroName = "rch-" + ($WSLDistro -split '-')[0].ToLower()
-Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
-
-# ------------------------------#
-# Variables
-# ------------------------------#
-$HostsFile      = "$env:windir\System32\drivers\etc\hosts"
-$HostsMarker    = "# Engine aliases v1"
+$ScriptUrl = "https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1"
+$HostsFile = "$env:windir\System32\drivers\etc\hosts"
+$HostsMarker = "# Engine aliases v1"
+$AdminLog = Join-Path $env:ProgramData "ReachSysinit\admin.log"
+$RebootExitCode = 3010
 $RebootRequired = $false
+
+$Me = [Security.Principal.WindowsIdentity]::GetCurrent()
+$IsAdmin = ([Security.Principal.WindowsPrincipal]$Me).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 # wsl.exe emits UTF-16; strip NULs so name matching works
 function Get-WslDistros {
     (wsl.exe --list --quiet 2>$null) -replace "`0", "" | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }
 }
 
-# ------------------------------#
-# PATH Refresh
-# ------------------------------#
 function Refresh-EnvPath {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
                 [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
 
-# ------------------------------#
+# =======================================================================
+# Machine-wide steps (require Administrator)
+# =======================================================================
+
 # mkcert (direct from the official GitHub release; winget is unreliable here)
-# ------------------------------#
 function Install-Mkcert {
     if (Get-Command mkcert -ErrorAction SilentlyContinue) {
         Write-Host "mkcert already installed."
@@ -96,14 +73,7 @@ function Install-Mkcert {
     }
 }
 
-if ($Dev) { Install-Mkcert }
-
-# ------------------------------#
-# WSL SETUP
-# ------------------------------#
-Write-Host "`n===== Setting Up WSL =====" -ForegroundColor Cyan
-
-function Ensure-WSL {
+function Enable-WslFeatures {
     foreach ($Feature in "Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform") {
         $State = (Get-WindowsOptionalFeature -Online -FeatureName $Feature).State
         if ($State -eq "EnablePending") {
@@ -131,13 +101,99 @@ function Ensure-WSL {
         }
         bcdedit.exe /set hypervisorlaunchtype auto | Out-Null
         $script:RebootRequired = $true
-        return
     }
-
-    wsl.exe --set-default-version 2
 }
 
-Ensure-WSL
+# hosts file update (single write; retried because AV/other tools can lock it)
+function Update-HostsFile {
+    if ((Get-Content $HostsFile) -contains $HostsMarker) { return }
+
+    $HostsBlock = @($HostsMarker) + (@(
+        "admin.rch.local", "admin-api.rch.local", "checkout.rch.local", "portal.rch.local",
+        "reports.rch.local", "stash.rch.local", "redirect.rch.local", "vue.admin.rch.local"
+    ) | ForEach-Object { "127.0.0.1 $_" })
+
+    foreach ($Attempt in 1..5) {
+        try {
+            Add-Content -Path $HostsFile -Value (@("") + $HostsBlock) -ErrorAction Stop
+            return
+        } catch {
+            Start-Sleep -Seconds 2
+        }
+    }
+    Write-Host "WARNING: could not update $HostsFile (locked by another process). Re-run this script." -ForegroundColor Red
+}
+
+function Invoke-AdminSetup {
+    Write-Host "`n===== Machine-wide setup (Administrator) =====" -ForegroundColor Cyan
+    if ($Dev) { Install-Mkcert }
+    Enable-WslFeatures
+    if ($Dev) { Update-HostsFile }
+}
+
+if ($AdminPhase) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $AdminLog) | Out-Null
+    Start-Transcript -Path $AdminLog -Force | Out-Null
+    Invoke-AdminSetup
+    Stop-Transcript | Out-Null
+    exit $(if ($RebootRequired) { $RebootExitCode } else { 0 })
+}
+
+# =======================================================================
+# Per-user steps (run as the invoking user)
+# =======================================================================
+
+if ($SSHKey) {
+    if (-not (Test-Path -LiteralPath $SSHKey -PathType Leaf)) {
+        Write-Host "ERROR: -SSHKey file not found: $SSHKey" -ForegroundColor Red
+        exit 1
+    }
+    $SSHKey = (Resolve-Path -LiteralPath $SSHKey).Path
+}
+
+# e.g. "Ubuntu-24.04" -> "rch-ubuntu"
+$EffectiveDistroName = "rch-" + ($WSLDistro -split '-')[0].ToLower()
+
+Write-Host "`n===== Reach Windows Dev Setup Starting =====" -ForegroundColor Cyan
+Write-Host "Windows user: $($Me.Name)" -ForegroundColor Cyan
+Write-Host "WSL Distro: $WSLDistro" -ForegroundColor Cyan
+Write-Host "Distro Name: $EffectiveDistroName" -ForegroundColor Cyan
+Write-Host "SSH key: $(if ($SSHKey) { $SSHKey } else { '(none)' })" -ForegroundColor Cyan
+Write-Host "Dev environment: $Dev" -ForegroundColor Cyan
+
+if ($IsAdmin) {
+    # An elevated prompt opened with a different admin account would install WSL for that account
+    $ConsoleUser = (Get-CimInstance Win32_ComputerSystem).UserName
+    if ($ConsoleUser -and $ConsoleUser -ne $Me.Name) {
+        Write-Host "ERROR: this PowerShell runs as $($Me.Name), but you are logged in as $ConsoleUser." -ForegroundColor Red
+        Write-Host "WSL would be installed for $($Me.Name) only. Run the script from a regular (non-admin) PowerShell." -ForegroundColor Red
+        exit 1
+    }
+    Invoke-AdminSetup
+} else {
+    Write-Host "`nRequesting Administrator rights for machine-wide setup (UAC prompt)..." -ForegroundColor Yellow
+    $ChildArgs = @("-AdminPhase") + $(if ($Dev) { @("-Dev") } else { @() })
+    if ($PSCommandPath) {
+        $ArgList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $ChildArgs
+    } else {
+        $ChildCmd = "& ([scriptblock]::Create((irm $ScriptUrl))) $($ChildArgs -join ' ')"
+        $ArgList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
+                     [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($ChildCmd)))
+    }
+    try {
+        $Child = Start-Process powershell.exe -Verb RunAs -ArgumentList $ArgList -Wait -PassThru -ErrorAction Stop
+    } catch {
+        Write-Host "ERROR: Administrator rights are required for machine-wide setup (UAC was declined)." -ForegroundColor Red
+        exit 1
+    }
+    if ($Child.ExitCode -eq $RebootExitCode) {
+        $RebootRequired = $true
+    } elseif ($Child.ExitCode -ne 0) {
+        Write-Host "ERROR: machine-wide setup failed (exit $($Child.ExitCode)). See $AdminLog" -ForegroundColor Red
+        exit 1
+    }
+    Refresh-EnvPath
+}
 
 # ------------------------------#
 # INSTALL DISTRO
@@ -162,9 +218,11 @@ function Install-distro {
     }
 }
 
+Write-Host "`n===== Setting Up WSL =====" -ForegroundColor Cyan
 if ($RebootRequired) {
     Write-Host "Skipping distro install - reboot required first." -ForegroundColor Yellow
 } else {
+    wsl.exe --set-default-version 2
     Install-distro
 }
 
@@ -211,39 +269,12 @@ if ($RebootRequired) {
     Write-Host "sysinit complete." -ForegroundColor Green
 }
 
+# mkcert CA trust goes into the current user's certificate store
 if ($Dev) {
-    # =======================================================================
-    # mkcert CA Install
-    # =======================================================================
-    Refresh-EnvPath
     if (Get-Command mkcert -ErrorAction SilentlyContinue) {
         mkcert -install
     } else {
         Write-Host "WARNING: mkcert not found - skipping CA install. Re-run this script." -ForegroundColor Red
-    }
-
-    # =======================================================================
-    # hosts File Update (single write; retried because AV/other tools can lock it)
-    # =======================================================================
-    if ((Get-Content $HostsFile) -notcontains $HostsMarker) {
-        $HostsBlock = @($HostsMarker) + (@(
-            "admin.rch.local", "admin-api.rch.local", "checkout.rch.local", "portal.rch.local",
-            "reports.rch.local", "stash.rch.local", "redirect.rch.local", "vue.admin.rch.local"
-        ) | ForEach-Object { "127.0.0.1 $_" })
-
-        $HostsUpdated = $false
-        foreach ($Attempt in 1..5) {
-            try {
-                Add-Content -Path $HostsFile -Value (@("") + $HostsBlock) -ErrorAction Stop
-                $HostsUpdated = $true
-                break
-            } catch {
-                Start-Sleep -Seconds 2
-            }
-        }
-        if (-not $HostsUpdated) {
-            Write-Host "WARNING: could not update $HostsFile (locked by another process). Re-run this script." -ForegroundColor Red
-        }
     }
 }
 
@@ -256,20 +287,20 @@ if ($RebootRequired) {
     Write-Host "`n*** REBOOT REQUIRED ***" -ForegroundColor Red
     Write-Host "Windows features or the WSL distro were just installed and need a reboot to activate." -ForegroundColor Yellow
 
-    # Resume at next logon via an elevated scheduled task (no UAC prompt), then reboot
-    $Rerun = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.ps1))) -WSLDistro $WSLDistro"
+    # Resume at this user's next logon via HKCU RunOnce (removed by Windows once it runs), then reboot
+    $Rerun = "& ([scriptblock]::Create((irm $ScriptUrl))) -WSLDistro $WSLDistro"
     if ($SSHKey) { $Rerun += " -SSHKey '" + ($SSHKey -replace "'", "''") + "'" }
     if ($Dev) { $Rerun += " -Dev" }
-    $ResumeLog = Join-Path $env:ProgramData "ReachSysinit\resume.log"
-    New-Item -ItemType Directory -Force -Path (Split-Path $ResumeLog) | Out-Null
-    $ResumeCmd = "Start-Transcript -Path '$ResumeLog' -Force | Out-Null; " +
-                 "while (-not (Test-Connection -ComputerName github.com -Count 1 -Quiet)) { Start-Sleep -Seconds 3 }; $Rerun"
-    $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($ResumeCmd))
-    $Me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoExit -ExecutionPolicy Bypass -EncodedCommand $Encoded"
-    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $Me
-    $Principal = New-ScheduledTaskPrincipal -UserId $Me -LogonType Interactive -RunLevel Highest
-    Register-ScheduledTask -TaskName "ReachSysinitResume" -Action $Action -Trigger $Trigger -Principal $Principal -Force | Out-Null
+    $ResumeDir = Join-Path $env:LOCALAPPDATA "ReachSysinit"
+    $ResumeScript = Join-Path $ResumeDir "resume.ps1"
+    New-Item -ItemType Directory -Force -Path $ResumeDir | Out-Null
+    Set-Content -Path $ResumeScript -Value @(
+        "Start-Transcript -Path '$(Join-Path $ResumeDir 'resume.log')' -Force | Out-Null",
+        "while (-not (Test-Connection -ComputerName github.com -Count 1 -Quiet)) { Start-Sleep -Seconds 3 }",
+        $Rerun
+    )
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "ReachSysinitResume" `
+        -Value "powershell.exe -NoExit -ExecutionPolicy Bypass -File `"$ResumeScript`""
 
     Write-Host "Setup resumes automatically after you log in. Rebooting in 10 seconds (cancel with: shutdown /a)." -ForegroundColor Yellow
     Write-Host "To run it manually instead:" -ForegroundColor Yellow
