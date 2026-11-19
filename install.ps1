@@ -268,11 +268,17 @@ if ($RebootRequired) {
     Write-Host "`nSkipping WSL sysinit - reboot required first." -ForegroundColor Yellow
 } else {
     Write-Host "`nRunning Reach sysinit inside $EffectiveDistroName..." -ForegroundColor Cyan
+    $SysinitFailed = $false
     $DevArg = if ($Dev) { "--dev" } else { "" }
 
     wsl.exe -d $EffectiveDistroName -- bash -c "sudo apt-get update -y && sudo apt-get install -y wget && wget -O - https://raw.githubusercontent.com/withreach/sysinit/refs/heads/main/install.sh | bash -s -- $DevArg"
-
-    Write-Host "sysinit complete." -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) {
+        $SysinitFailed = $true
+        Write-Host "`nERROR: install.sh failed inside $EffectiveDistroName (exit $LASTEXITCODE) - see the output above." -ForegroundColor Red
+        Write-Host "Fix the cause, then re-run this script (steps already done are skipped)." -ForegroundColor Yellow
+    } else {
+        Write-Host "sysinit complete." -ForegroundColor Green
+    }
 }
 
 # mkcert CA trust goes into the current user's certificate store
@@ -312,6 +318,9 @@ if ($RebootRequired) {
     Write-Host "To run it manually instead:" -ForegroundColor Yellow
     Write-Host "  $Rerun" -ForegroundColor White
     shutdown.exe /r /t 10 /c "Reach sysinit: reboot to finish WSL setup"
+} elseif ($SysinitFailed) {
+    Write-Host "`nSetup did NOT complete: install.sh failed in WSL (see the error above)." -ForegroundColor Red
+    exit 1
 } else {
     Write-Host "Reach sysinit ready."
 }
