@@ -205,16 +205,22 @@ setup_reach_repos() {
   mkdir -p "$HOME/.config/Code/User"
 }
 
-install_packages
-[[ "$DEV" == true ]] && check_github_ssh
-install_ssm_plugin
-install_docker
-install_mise
-deploy_dotfiles
-setup_ssh_key
-if [[ "$DEV" == true ]]; then
-  configure_system
-  setup_reach_repos
-fi
-log "Done. Open a new shell (docker group membership needs a re-login)."
-[[ "$DEV" == true ]] || log "Reach dev environment not installed; run again with --dev to add it."
+# Everything runs from main so that, under `wget ... | bash`, bash has read the whole script before any
+# command (ssh, apt, ...) can consume the rest of stdin.
+main() {
+  install_packages
+  [[ "$DEV" == true ]] && check_github_ssh
+  install_ssm_plugin
+  install_docker
+  install_mise
+  deploy_dotfiles
+  setup_ssh_key
+  if [[ "$DEV" == true ]]; then
+    configure_system
+    setup_reach_repos
+  fi
+  log "Done. Open a new shell (docker group membership needs a re-login)."
+  [[ "$DEV" == true ]] || log "Reach dev environment not installed; run again with --dev to add it."
+}
+
+main
