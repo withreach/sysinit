@@ -96,6 +96,6 @@ aws-get_all_running_instances() {
   fi
 
   local query="Reservations[].Instances[?State.Name == 'running'${query_search} | [0].Value, InstanceId][]"
-  
+
   readarray -t instance_array < <(aws ec2 describe-instances --query "$query" --output json | jq -r 'sort_by(.[]) | .[] | join(" ")')
 }
