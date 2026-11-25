@@ -1,3 +1,6 @@
+# Managed by sysinit and overwritten on every install.sh run; included from ~/.gitconfig.
+# Put personal settings in ~/.gitconfig, where they override these.
+
 [alias]
   # Show all of my configured aliases
   aliases = !git config --list | grep 'alias\\.' | sed 's/alias\\.\\([^=]*\\)=\\(.*\\)/\\1\\ \t => \\2/' | sort
@@ -37,10 +40,6 @@
 
   # EOL attribute
   whitespace = cr-at-eol
-
-[credential]
-  # external helper to be called when a username or password credential
-  helper = store
 
 [diff]
   # Use better, descriptive initials (c, i, w) instead of a/b.
@@ -96,10 +95,7 @@
   sort = version:refname
 
 [user]
-  # these are about the most basic and should pretty much always exist
-  email = @GIT_USER_EMAIL@
-  name = @GIT_USER_NAME@
-  signingkey = 
+  # name and email live in ~/.gitconfig (set by install.sh); refuse to guess them
   useConfigOnly = true
 
 [rerere]
