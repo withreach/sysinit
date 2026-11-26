@@ -30,8 +30,6 @@ MISE_TOOLS=(
   amazon-ecr-credential-helper awscli claude github-cli granted jq mkcert
   pre-commit python@3.11 python@3.14 starship usage uv worktrunk
 )
-# mise release signing key (https://mise.jdx.dev/installing-mise.html)
-MISE_GPG_KEY=24853EC9F655CE80B48E6C3A8B81C9D17413A06D
 # Fixed path: reach-devops' docker-compose.ssl.yml mounts it into the cert generator
 MKCERT_CAROOT="$HOME/.local/share/mkcert"
 GCM_WSL="/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
@@ -140,15 +138,18 @@ install_mise() {
   export PATH="$HOME/.local/bin:$PATH"
   if ! command -v mise >/dev/null; then
     log "mise"
-    local dir
-    dir="$(mktemp -d)"
-    gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "$MISE_GPG_KEY"
-    curl -fsSL https://mise.jdx.dev/install.sh.sig | gpg --decrypt >"$dir/install.sh"
-    sh "$dir/install.sh"
-    rm -rf "$dir"
+    # The mise.run installer checks the archive against checksums embedded in it or published on GitHub.
+    # (Not the GPG-signed variant: `gpg --recv-keys` has no timeout and hangs where keyservers are blocked.)
+    local script
+    script="$(mktemp)"
+    curl -fsSL https://mise.run -o "$script"
+    sh "$script"
+    rm -f "$script"
   fi
-  log "mise tools"
-  mise use --global --yes "${MISE_TOOLS[@]}" || warn "mise tool install failed (GitHub rate limit?); re-run later"
+  log "mise tools (downloads ${#MISE_TOOLS[@]} tools; can take several minutes)"
+  # stdin from /dev/null: a hidden prompt fails instead of waiting forever
+  MISE_YES=1 mise use --global --yes "${MISE_TOOLS[@]}" </dev/null ||
+    warn "mise tool install failed (GitHub rate limit?); re-run later"
 }
 
 # name/email: environment, then existing git config, then ask. Never invent one: useConfigOnly makes git
