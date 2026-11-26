@@ -351,7 +351,7 @@ function Initialize-Distro {
     Write-Host "`n===== Preparing $EffectiveDistroName =====" -ForegroundColor Cyan
     $Changed = $false
 
-    $Prep = $WslConfFn + @'
+    $Prep = $WslConfFn + "`n" + @'
 set -e
 if ! command -v curl >/dev/null || ! command -v ssh-keygen >/dev/null || ! command -v sudo >/dev/null; then
   export DEBIAN_FRONTEND=noninteractive
@@ -377,7 +377,7 @@ exit 0
             if (-not $LinuxUser) { $LinuxUser = $Default }
         } until ($LinuxUser -match '^[a-z_][a-z0-9_-]{0,31}$')
 
-        $AddUser = $WslConfFn + @'
+        $AddUser = $WslConfFn + "`n" + @'
 set -e
 useradd -m -s /bin/bash -G sudo __USER__
 set_conf user default __USER__ || true
